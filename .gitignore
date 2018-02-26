@@ -1,2 +1,3 @@
-cookies/*.json
 config.json
+cookies/*.json
+data/*.json
