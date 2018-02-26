@@ -1,10 +1,10 @@
-var Client = require('instagram-private-api').V1;
-var _ = require('lodash');
-var fs = require('fs');
-var config = require("../config.json");
+const Client = require('instagram-private-api').V1;
+const _ = require('lodash');
+const fs = require('fs');
+const config = require("../config.json");
 
-var device = new Client.Device(config.username);
-var storage = new Client.CookieFileStorage(__dirname + `/../cookies/${config.username}.json`);
+const device = new Client.Device(config.username);
+const storage = new Client.CookieFileStorage(__dirname + `/../cookies/${config.username}.json`);
 
 Client.Session.create(device, storage, config.username, config.password)
   .then((session) => {

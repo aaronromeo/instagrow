@@ -12,3 +12,34 @@ TODO List
 * Determine which users are MVPs and which are dead leads
 
 * Unfollow dead leads (unless they have immunity)
+
+
+------
+
+Sample saved user data
+
+CREATE TABLE accounts (
+  instagram_id integer PRIMARY KEY,
+  username text NOT NULL,
+  last_interacted_at text,
+  latest_media_id integer,
+  has_liked integer,
+  latest_media_url text
+)
+
+Account:
+  123456: {
+    "id": 123456,
+    "username": "instagram.user",
+    "lastPostedMediaId": 987654321,
+    "last_interacted_at": ""
+  }
+
+Media:
+  987654321: {
+    mediaId: "46244123",
+    url: "...",
+    postedAt: "...",
+    accountId: 123456,
+    hasLiked: false
+  }
