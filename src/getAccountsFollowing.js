@@ -1,31 +1,36 @@
 const Client = require('instagram-private-api').V1;
 const _ = require('lodash');
-const fs = require('fs');
-const config = require("../config.json");
+const Promise = require('bluebird');
 
-const device = new Client.Device(config.username);
-const storage = new Client.CookieFileStorage(__dirname + `/../cookies/${config.username}.json`);
+const sessionSingleton = require("./services/sessionSingleton");
+const databaseService = require("./services/database");
 
-Client.Session.create(device, storage, config.username, config.password)
-  .then((session) => {
-    return session
+
+const addAccountIfNull = (user) => {
+  return databaseService.handler.getAccountByInstagramId(user.id)
+  .then((row) => {
+    if (!row || row===undefined) {
+      return databaseService.handler.addAccount(user.id, user._params.username);
+    } else return row;
   })
+}
+
+sessionSingleton.getSession
   .then((session) => {
     return [session, session.getAccountId()];
   })
   .spread((session, accountId) => {
-    return [session, new Client.Feed.AccountFollowing(session, accountId)];
+    return new Client.Feed.AccountFollowing(session, accountId);
   })
-  .spread((session, feed) => {
-    return [session, feed.get()];
+  .then((feed) => {
+    return feed.get();
   })
-  .spread(function(session, followingResults) {
-    const users = followingResults.map(user => {
-      return {id: user.id, username: user._params.username};
-    });
-    fs.writeFile("data/accounts-following.json", JSON.stringify(users), err => {
-      if (err) throw err;
+  .then((followingResults) => {
+    return Promise.map(followingResults, user => addAccountIfNull(user));
+  })
+  .then((accountRows) => {
+    accountRows.forEach(account => console.log(account));
+    databaseService.handler.close();
+    console.log("List of Accounts followed successfully saved!");
+  })
 
-      console.log("List of Accounts followed successfully saved!");
-    });
-  })
