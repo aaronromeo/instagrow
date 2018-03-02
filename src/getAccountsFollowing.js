@@ -5,17 +5,7 @@ const Promise = require('bluebird');
 const sessionSingleton = require("./services/sessionSingleton");
 const databaseService = require("./services/database");
 
-
-const addAccountIfNull = (user) => {
-  return databaseService.handler.getAccountByInstagramId(user.id)
-  .then((row) => {
-    if (!row || row===undefined) {
-      return databaseService.handler.addAccount(user.id, user._params.username);
-    } else return row;
-  })
-}
-
-sessionSingleton.getSession
+const getAccountsFollowing = sessionSingleton.getSession
   .then((session) => {
     return [session, session.getAccountId()];
   })
@@ -26,11 +16,22 @@ sessionSingleton.getSession
     return feed.get();
   })
   .then((followingResults) => {
-    return Promise.map(followingResults, user => addAccountIfNull(user));
+    return Promise.map(
+      followingResults,
+      user => databaseService.handler.addAccountOrUpdateUsername(user.id, user._params.username)
+    );
   })
   .then((accountRows) => {
     accountRows.forEach(account => console.log(account));
-    databaseService.handler.close();
-    console.log("List of Accounts followed successfully saved!");
+    const badAccounts = accountRows.filter(account => !account);
+    if (!badAccounts.length) {
+      console.log("List of Accounts followed successfully saved!");
+    } else {
+      console.log(`Error saving accounts ${badAccounts}`);
+    }
   })
+  .finally(() => databaseService.handler.close())
 
+exports.instagrow = {
+  getAccountsFollowing,
+};
