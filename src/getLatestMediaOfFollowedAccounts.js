@@ -1,31 +1,30 @@
 const Client = require('instagram-private-api').V1;
 const _ = require('lodash');
-const moment = require('moment');
 const Promise = require('bluebird');
+
 const sessionSingleton = require("./services/sessionSingleton");
 const databaseService = require("./services/database");
 
-sessionSingleton.getSession
+exports.getLatestMediaOfFollowedAccounts = () => sessionSingleton.getSession
   .then((session) => {
-    const accountsFollowing = databaseService.handler.getAccounts();
+    const accountsFollowing = databaseService.handler.getAccountsPossiblyRequiringInteraction();
     return [session, accountsFollowing]
   })
   .spread((session, accountsFollowing) => {
     const accountsFollowingUserMedia = accountsFollowing.map(accountFollowing => {
-      return new Client.Feed.UserMedia(session, accountFollowing.instagramId, 5);
+      return new Client.Feed.UserMedia(session, accountFollowing.instagramId, 1);
     })
     return [session, accountsFollowingUserMedia];
   })
   .spread((session, accountsFollowingUserMedia) => {
-    const accountsFollowingUserMediaPromises = accountsFollowingUserMedia.map(latestUserMedia => {
-      return latestUserMedia.get();
+    return Promise.map(accountsFollowingUserMedia, latestUserMedia => {
+      return latestUserMedia.get()
+        .catch(e => {console.log(`${e.message} trying to retrieve ${latestUserMedia.accountId}`)});
     });
-    return Promise.all(accountsFollowingUserMediaPromises);
   })
   .then(usersMedia => {
-    return Promise.map(usersMedia, medias => {
+    return Promise.map(_.compact(usersMedia), medias => {
       if (!medias.length === 0 || !medias[0] || !medias[0]._params) {
-        console.log(medias);
         return null;
       };
       if (medias[0]._params.hasLiked) {
@@ -34,11 +33,11 @@ sessionSingleton.getSession
             medias[0]._params.user.pk,
             medias[0]._params.id,
             medias[0]._params.webLink,
-            moment(medias[0]._params.takenAt).format(),
+            medias[0]._params.takenAt,
           ),
           databaseService.handler.updateLastInteration(
             medias[0]._params.user.pk,
-            moment(medias[0]._params.takenAt).format(),
+            medias[0]._params.takenAt,
           ),
         ]);
       } else {
@@ -46,12 +45,12 @@ sessionSingleton.getSession
           medias[0]._params.user.pk,
           medias[0]._params.id,
           medias[0]._params.webLink,
-          moment(medias[0]._params.takenAt).format(),
+          medias[0]._params.takenAt,
         )
       }
     });
   })
   .then(usersMedia => {
-    console.log("Account media followed successfully saved!");
+    console.log(`Account media followed successfully saved for ${usersMedia.length} accounts!`);
+    return Promise.resolve();
   })
-  .finally(() => databaseService.handler.close())
