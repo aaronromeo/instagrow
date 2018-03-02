@@ -1,10 +1,7 @@
 const Promise = require('bluebird');
 const sqlite3 = Promise.promisifyAll(require('sqlite3').verbose());
 const humps = require('humps');
-const moment = require('moment');
 const config = require("../../config.json");
-
-const INTERACTION_DELTA_IN_DAYS = 3;
 
 // open the database connection
 let db = new sqlite3.Database('data/instagrow.db', sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE, (err) => {
@@ -17,16 +14,16 @@ const create = () => {
   db.run(`CREATE TABLE IF NOT EXISTS accounts (
             instagram_id integer PRIMARY KEY,
             username text NOT NULL,
-            last_interaction_at integer DEFAULT NULL,
-            latest_media_created_at integer DEFAULT NULL,
+            last_interaction_at text DEFAULT NULL,
+            latest_media_created_at text DEFAULT NULL,
             latest_media_id integer DEFAULT NULL,
             latest_media_url text DEFAULT NULL
           );`);
   console.log('Created Database successfully.');
 };
 
-const getAccountsPossiblyRequiringInteraction = () => {
-  const sql = `SELECT
+const getAccounts = () => {
+  let sql = `SELECT
                 instagram_id,
                 username,
                 last_interaction_at,
@@ -34,48 +31,9 @@ const getAccountsPossiblyRequiringInteraction = () => {
                 latest_media_id,
                 latest_media_url
               FROM
-                accounts
-              WHERE
-                last_interaction_at < ?
-              OR last_interaction_at IS NULL`;
+                accounts`;
 
-  return db.allAsync(sql, [moment().subtract(INTERACTION_DELTA_IN_DAYS, 'd')])
-          .then(row => humps.camelizeKeys(row));
-};
-
-const getAccountsToBeLiked = () => {
-  const maximumAgeOfContentConsidered = moment().subtract(1, 'w');
-  const sql = `SELECT
-                instagram_id,
-                username,
-                last_interaction_at,
-                latest_media_created_at,
-                latest_media_id,
-                latest_media_url
-              FROM
-                accounts
-              WHERE
-                (
-                  last_interaction_at IS NULL
-                  AND latest_media_created_at IS NOT NULL
-                  AND latest_media_created_at > ?
-                )
-              OR
-                (
-                  latest_media_created_at > ?
-                  AND last_interaction_at < latest_media_created_at
-                  AND last_interaction_at < ?
-                )
-              ORDER BY latest_media_created_at
-            `;
-
-  return db.allAsync(
-    sql, [
-      maximumAgeOfContentConsidered.valueOf(),
-      maximumAgeOfContentConsidered.valueOf(),
-      moment().subtract(INTERACTION_DELTA_IN_DAYS, 'd'),
-    ]
-  ).then(row => humps.camelizeKeys(row));
+  return db.allAsync(sql, []).then(row => humps.camelizeKeys(row));
 };
 
 const getAccountByInstagramId = (instagramId) => {
@@ -139,9 +97,8 @@ const close = () => db.close((err) => {
 exports.handler = {
   create,
   addAccountOrUpdateUsername,
-  getAccountsPossiblyRequiringInteraction,
+  getAccounts,
   getAccountByInstagramId,
-  getAccountsToBeLiked,
   updateLatestMediaDetails,
   updateLastInteration,
   close,
