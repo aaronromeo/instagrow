@@ -1,11 +1,10 @@
 const Client = require('instagram-private-api').V1;
-const _ = require('lodash');
 const Promise = require('bluebird');
 
 const sessionSingleton = require("./services/sessionSingleton");
 const databaseService = require("./services/database");
 
-const getAccountsFollowing = sessionSingleton.getSession
+exports.getAccountsFollowing = () => sessionSingleton.getSession
   .then((session) => {
     return [session, session.getAccountId()];
   })
@@ -22,16 +21,12 @@ const getAccountsFollowing = sessionSingleton.getSession
     );
   })
   .then((accountRows) => {
-    accountRows.forEach(account => console.log(account));
     const badAccounts = accountRows.filter(account => !account);
     if (!badAccounts.length) {
-      console.log("List of Accounts followed successfully saved!");
+      console.log(`List of Accounts followed successfully saved for ${accountRows.length} accounts`);
+      return Promise.resolve();
     } else {
       console.log(`Error saving accounts ${badAccounts}`);
+      return Promise.reject();
     }
   })
-  .finally(() => databaseService.handler.close())
-
-exports.instagrow = {
-  getAccountsFollowing,
-};
