@@ -6,7 +6,8 @@ const moment = require('moment');
 const sessionSingleton = require("./services/sessionSingleton");
 const databaseService = require("./services/database");
 
-const MAX_EXECUTION_TIME = 200000;
+const MIN_DELAY = 2000;
+const MAX_DELAY = 10000;
 
 const likeMedia = (session, account) => {
   console.log(`Liking ${account.username}\t(${account.instagramId})\t${account.latestMediaUrl} at ${moment()}`)
@@ -37,7 +38,7 @@ exports.updateLikedMedia = () => sessionSingleton.getSession
     let nextRun = 0;
     console.log();
     return Promise.mapSeries(_.shuffle(accountsToBeLiked), accountToBeInteractedWith => {
-      nextRun = getRandomInt(2000, 10000);
+      nextRun = getRandomInt(MIN_DELAY, MAX_DELAY);
       return Promise.delay(nextRun).then(() => likeMedia(session, accountToBeInteractedWith));
     });
   })
