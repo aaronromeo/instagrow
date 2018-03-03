@@ -5,7 +5,7 @@ const moment = require('moment');
 
 const INTERACTION_DELTA_IN_DAYS = 3;
 
-class DatabaseHandler {
+class SqliteService {
   constructor(config) {
     this.config = config;
     this.db = new sqlite3.Database(`data/instagrow.${config.username}.db`, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE, (err) => {
@@ -149,7 +149,7 @@ class DatabaseHandler {
 
 let instance = null;
 const createInstance = (config) => {
-  instance = new DatabaseHandler(config);
+  instance = new SqliteService(config);
   return instance;
 }
 const getInstance = () => instance;

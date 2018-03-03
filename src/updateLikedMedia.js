@@ -4,7 +4,7 @@ const _ = require('lodash');
 const moment = require('moment');
 
 const sessionSingleton = require("./services/sessionSingleton");
-const databaseService = require("./services/database");
+const sqliteService = require("./services/sqlite");
 
 const MIN_DELAY = 2000;
 const MAX_DELAY = 10000;
@@ -13,7 +13,11 @@ const likeMedia = (session, account) => {
   console.log(`Liking ${account.username}\t(${account.instagramId})\t${account.latestMediaUrl} at ${moment()}`)
   return [
     new Client.Like.create(session, account.latestMediaId),
+<<<<<<< HEAD
     databaseService.handler.getInstance().updateLastInteration(account.instagramId, moment().valueOf())
+=======
+    sqliteService.handler.updateLastInteration(account.instagramId, moment().valueOf())
+>>>>>>> f810d70... WIP: Moving to dynamodb
   ];
 }
 
@@ -25,7 +29,11 @@ const getRandomInt = (min, max) => {
 
 exports.updateLikedMedia = (config) => sessionSingleton.session.createSession(config)
   .then((session) => {
+<<<<<<< HEAD
     const accountsToBeLiked = databaseService.handler.getInstance().getAccountsToBeLiked();
+=======
+    const accountsToBeLiked = sqliteService.handler.getAccountsToBeLiked();
+>>>>>>> f810d70... WIP: Moving to dynamodb
     return [session, accountsToBeLiked]
   })
   .spread((session, accountsToBeLiked) => {
