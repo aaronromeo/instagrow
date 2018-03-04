@@ -1,9 +1,30 @@
-TODO List
+# Instagrow
+
+### Purpose
+
+
+### Current Usage
+➜  node src/index.js -h
+
+  Usage: index [options] [command]
+
+  Instagrow, an Instagram engagement tool
+
+
+  Options:
+
+    -V, --version  output the version number
+    -h, --help     output usage information
+
+
+  Commands:
+
+    createDatabase|c <username>  Create an Instagram database to store activity
+    likeMedia|l <username>       Create "like" interactions for followed accounts who have posted content in the last 3-7 days
+
+### TODO List
 
 * Create more follower interactions
-- [ ] Get instagram followers via Request
-- [ ] See which followers have new content via ???
-- [ ] Like new content via Nightmare
 - [ ] Figure out how to deploy as a serverless architecture (https://github.com/dwyl/learn-aws-lambda)
 - [ ] Figure out how to use DynamoDB to store followers information
 
@@ -12,34 +33,3 @@ TODO List
 * Determine which users are MVPs and which are dead leads
 
 * Unfollow dead leads (unless they have immunity)
-
-
-------
-
-Sample saved user data
-
-CREATE TABLE accounts (
-  instagram_id integer PRIMARY KEY,
-  username text NOT NULL,
-  last_interacted_at text,
-  latest_media_id integer,
-  has_liked integer,
-  latest_media_url text
-)
-
-Account:
-  123456: {
-    "id": 123456,
-    "username": "instagram.user",
-    "lastPostedMediaId": 987654321,
-    "last_interacted_at": ""
-  }
-
-Media:
-  987654321: {
-    mediaId: "46244123",
-    url: "...",
-    postedAt: "...",
-    accountId: 123456,
-    hasLiked: false
-  }

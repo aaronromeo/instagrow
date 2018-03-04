@@ -19,7 +19,7 @@ commander
 commander
   .command('likeMedia <username>')
   .alias('l')
-  .description('Create "like" interactions')
+  .description('Create "like" interactions for followed accounts who have posted content in the last 3-7 days')
   .action((username) => {
     const config = require(`../config.${username}.json`);
     const databaseService = require("./services/database");
