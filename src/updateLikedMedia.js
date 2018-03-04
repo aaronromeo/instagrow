@@ -13,7 +13,7 @@ const likeMedia = (session, account) => {
   console.log(`Liking ${account.username}\t(${account.instagramId})\t${account.latestMediaUrl} at ${moment()}`)
   return [
     new Client.Like.create(session, account.latestMediaId),
-    databaseService.handler.updateLastInteration(account.instagramId, moment().valueOf())
+    databaseService.handler.getInstance().updateLastInteration(account.instagramId, moment().valueOf())
   ];
 }
 
@@ -23,9 +23,9 @@ const getRandomInt = (min, max) => {
   return Math.floor(Math.random() * (max - min)) + min; //The maximum is exclusive and the minimum is inclusive
 }
 
-exports.updateLikedMedia = () => sessionSingleton.getSession
+exports.updateLikedMedia = (config) => sessionSingleton.session.createSession(config)
   .then((session) => {
-    const accountsToBeLiked = databaseService.handler.getAccountsToBeLiked();
+    const accountsToBeLiked = databaseService.handler.getInstance().getAccountsToBeLiked();
     return [session, accountsToBeLiked]
   })
   .spread((session, accountsToBeLiked) => {

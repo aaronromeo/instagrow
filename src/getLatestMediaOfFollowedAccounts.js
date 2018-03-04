@@ -5,9 +5,9 @@ const Promise = require('bluebird');
 const sessionSingleton = require("./services/sessionSingleton");
 const databaseService = require("./services/database");
 
-exports.getLatestMediaOfFollowedAccounts = () => sessionSingleton.getSession
+exports.getLatestMediaOfFollowedAccounts = (config) => sessionSingleton.session.createSession(config)
   .then((session) => {
-    const accountsFollowing = databaseService.handler.getAccountsPossiblyRequiringInteraction();
+    const accountsFollowing = databaseService.handler.getInstance().getAccountsPossiblyRequiringInteraction();
     return [session, accountsFollowing]
   })
   .spread((session, accountsFollowing) => {
@@ -29,19 +29,19 @@ exports.getLatestMediaOfFollowedAccounts = () => sessionSingleton.getSession
       };
       if (medias[0]._params.hasLiked) {
         return Promise.all([
-          databaseService.handler.updateLatestMediaDetails(
+          databaseService.handler.getInstance().updateLatestMediaDetails(
             medias[0]._params.user.pk,
             medias[0]._params.id,
             medias[0]._params.webLink,
             medias[0]._params.takenAt,
           ),
-          databaseService.handler.updateLastInteration(
+          databaseService.handler.getInstance().updateLastInteration(
             medias[0]._params.user.pk,
             medias[0]._params.takenAt,
           ),
         ]);
       } else {
-        return databaseService.handler.updateLatestMediaDetails(
+        return databaseService.handler.getInstance().updateLatestMediaDetails(
           medias[0]._params.user.pk,
           medias[0]._params.id,
           medias[0]._params.webLink,
