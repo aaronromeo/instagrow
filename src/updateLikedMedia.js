@@ -13,11 +13,7 @@ const likeMedia = (session, account) => {
   console.log(`Liking ${account.username}\t(${account.instagramId})\t${account.latestMediaUrl} at ${moment()}`)
   return [
     new Client.Like.create(session, account.latestMediaId),
-<<<<<<< HEAD
-    databaseService.handler.getInstance().updateLastInteration(account.instagramId, moment().valueOf())
-=======
-    sqliteService.handler.updateLastInteration(account.instagramId, moment().valueOf())
->>>>>>> f810d70... WIP: Moving to dynamodb
+    sqliteService.handler.getInstance().updateLastInteration(account.instagramId, moment().valueOf())
   ];
 }
 
@@ -29,11 +25,7 @@ const getRandomInt = (min, max) => {
 
 exports.updateLikedMedia = (config) => sessionSingleton.session.createSession(config)
   .then((session) => {
-<<<<<<< HEAD
-    const accountsToBeLiked = databaseService.handler.getInstance().getAccountsToBeLiked();
-=======
-    const accountsToBeLiked = sqliteService.handler.getAccountsToBeLiked();
->>>>>>> f810d70... WIP: Moving to dynamodb
+    const accountsToBeLiked = sqliteService.handler.getInstance().getAccountsToBeLiked();
     return [session, accountsToBeLiked]
   })
   .spread((session, accountsToBeLiked) => {

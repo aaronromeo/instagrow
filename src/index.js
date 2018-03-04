@@ -4,6 +4,17 @@ commander
   .version('0.0.1')
   .description('Instagrow, an Instagram engagement tool');
 
+
+commander
+  .command('createDynamoDatabase <username>')
+  .alias('cd')
+  .description('Create an Instagram database to store activity')
+  .action((username) => {
+    const dynamodbService = require("./services/dynamodb");
+
+    dynamodbService.handler.create();
+  });
+
 commander
   .command('createDatabase <username>')
   .alias('c')

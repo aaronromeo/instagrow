@@ -6,6 +6,7 @@
   "license": "MIT",
   "dependencies": {
     "commander": "2.14.1",
+    "aws-sdk": "2.205.0",
     "humps": "2.0.1",
     "instagram-private-api": "0.6.7",
     "lodash": "4.17.5",
