@@ -1,3 +1,3 @@
-const database = require("./services/database");
+const databaseService = require("./services/database");
 
-database.handler.create();
+databaseService.handler.instance.create();

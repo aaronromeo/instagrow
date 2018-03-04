@@ -3,8 +3,9 @@ const Promise = require('bluebird');
 
 const sessionSingleton = require("./services/sessionSingleton");
 const databaseService = require("./services/database");
+const config = require("../config.json");
 
-exports.getAccountsFollowing = () => sessionSingleton.getSession
+exports.getAccountsFollowing = () => sessionSingleton.session.createSession(config)
   .then((session) => {
     return [session, session.getAccountId()];
   })
@@ -17,7 +18,7 @@ exports.getAccountsFollowing = () => sessionSingleton.getSession
   .then((followingResults) => {
     return Promise.map(
       followingResults,
-      user => databaseService.handler.addAccountOrUpdateUsername(user.id, user._params.username)
+      user => databaseService.handler.getInstance().addAccountOrUpdateUsername(user.id, user._params.username)
     );
   })
   .then((accountRows) => {
