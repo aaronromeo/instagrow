@@ -5,7 +5,6 @@ const moment = require('moment');
 
 const sessionSingleton = require("./services/sessionSingleton");
 const databaseService = require("./services/database");
-const config = require("../config.json");
 
 const MIN_DELAY = 2000;
 const MAX_DELAY = 10000;
@@ -24,7 +23,7 @@ const getRandomInt = (min, max) => {
   return Math.floor(Math.random() * (max - min)) + min; //The maximum is exclusive and the minimum is inclusive
 }
 
-exports.updateLikedMedia = () => sessionSingleton.session.createSession(config)
+exports.updateLikedMedia = (config) => sessionSingleton.session.createSession(config)
   .then((session) => {
     const accountsToBeLiked = databaseService.handler.getInstance().getAccountsToBeLiked();
     return [session, accountsToBeLiked]

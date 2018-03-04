@@ -4,9 +4,8 @@ const Promise = require('bluebird');
 
 const sessionSingleton = require("./services/sessionSingleton");
 const databaseService = require("./services/database");
-const config = require("../config.json");
 
-exports.getLatestMediaOfFollowedAccounts = () => sessionSingleton.session.createSession(config)
+exports.getLatestMediaOfFollowedAccounts = (config) => sessionSingleton.session.createSession(config)
   .then((session) => {
     const accountsFollowing = databaseService.handler.getInstance().getAccountsPossiblyRequiringInteraction();
     return [session, accountsFollowing]

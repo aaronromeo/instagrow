@@ -3,9 +3,8 @@ const Promise = require('bluebird');
 
 const sessionSingleton = require("./services/sessionSingleton");
 const databaseService = require("./services/database");
-const config = require("../config.json");
 
-exports.getAccountsFollowing = () => sessionSingleton.session.createSession(config)
+exports.getAccountsFollowing = (config) => sessionSingleton.session.createSession(config)
   .then((session) => {
     return [session, session.getAccountId()];
   })
