@@ -81,7 +81,7 @@ class DatabaseHandler {
   };
 
   getAccountByInstagramId(instagramId) {
-    let sql = `SELECT
+    const sql = `SELECT
                   instagram_id,
                   username,
                   last_interaction_at,
@@ -93,6 +93,12 @@ class DatabaseHandler {
                 WHERE instagram_id=?`;
 
     return this.db.getAsync(sql, [instagramId]).then(row => humps.camelizeKeys(row));
+  };
+
+  getMediaWithLastInteraction() {
+    const sql = `SELECT * FROM accounts ORDER BY last_interaction_at DESC LIMIT 1;`;
+
+    return this.db.getAsync(sql).then(row => humps.camelizeKeys(row));
   };
 
   addAccountOrUpdateUsername(instagramId, username) {
