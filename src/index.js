@@ -51,7 +51,7 @@ commander
 commander
   .command('likeMedia <username>')
   .alias('l')
-  .description('Create "like" interactions for followed accounts based in the cached media data (from updateFollowersMedia) newer than 7 days old')
+  .description('Create "like" interactions for followed accounts who have posted content in the last 3-7 days')
   .action((username) => {
     const config = require(`../config.${username}.json`);
     const databaseService = require("./services/database");
