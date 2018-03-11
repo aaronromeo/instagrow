@@ -9,32 +9,48 @@ AWS.config.update({
 });
 AWS.config.setPromisesDependency(Promise);
 
-var dynamodb = new AWS.DynamoDB();
+class DynamoDBService {
+  constructor(config) {
+    this.config = config;
+    this.tableName = `Instagrow-${config.username}-Accounts`;
+    this.db = new AWS.DynamoDB();
+  };
 
-var params = {
-  TableName : "Instagrow-Accounts",
-  KeySchema: [
-    { AttributeName: "instagramId", KeyType: "HASH"}   //Partition key
-  ],
-  AttributeDefinitions: [
-    { AttributeName: "instagramId", AttributeType: "S" }
-  ],
-  ProvisionedThroughput: {
-    ReadCapacityUnits: 1,
-    WriteCapacityUnits: 1
+  create() {
+    const CREATE_SCRIPT = {
+      TableName : this.tableName,
+      KeySchema: [
+        { AttributeName: "instagramId", KeyType: "HASH"}   //Partition key
+      ],
+      AttributeDefinitions: [
+        { AttributeName: "instagramId", AttributeType: "S" }
+      ],
+      ProvisionedThroughput: {
+        ReadCapacityUnits: 1,
+        WriteCapacityUnits: 1
+      }
+    };
+
+    return this.db.createTable(CREATE_SCRIPT).promise()
+      .then((data) => {
+        console.log("Created table. Table description JSON:", JSON.stringify(data, null, 2));
+        return new Promise.resolve(data);
+      })
+      .catch((err) => {
+        console.error("Unable to create table. Error JSON:", JSON.stringify(err, null, 2));
+        return new Promise.reject(err);
+      });
   }
-};
+}
 
-const create = () => dynamodb.createTable(params).promise()
-  .then((data) => {
-    console.log("Created table. Table description JSON:", JSON.stringify(data, null, 2));
-    return new Promise.resolve(data);
-  })
-  .catch((err) => {
-    console.error("Unable to create table. Error JSON:", JSON.stringify(err, null, 2));
-    return new Promise.reject(err);
-  });
+let instance = null;
+const createInstance = (config) => {
+  instance = new DynamoDBService(config);
+  return instance;
+}
+const getInstance = () => instance;
 
 exports.handler = {
-  create,
+  createInstance,
+  getInstance,
 };

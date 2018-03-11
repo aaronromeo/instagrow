@@ -10,9 +10,11 @@ commander
   .alias('cd')
   .description('Create an Instagram database to store activity')
   .action((username) => {
+    const config = require(`../config.${username}.json`);
     const dynamodbService = require("./services/dynamodb");
 
-    dynamodbService.handler.create();
+    dynamodbService.handler.createInstance(config);
+    dynamodbService.handler.getInstance().create();
   });
 
 commander
