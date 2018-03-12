@@ -102,42 +102,6 @@ class DynamoDBService {
       ]
     };
 
-    const DELETE_INDEX_LATEST_MEDIA = {
-      TableName : this.usersTable,
-      GlobalSecondaryIndexUpdates: [
-        {
-          Delete: {
-            IndexName: "latestCreatedMediaIndex",
-          }
-        }
-      ]
-    };
-
-    const CREATE_INDEX_LATEST_MEDIA = {
-      TableName : this.usersTable,
-      AttributeDefinitions: [
-        { AttributeName: "instagramOwner", AttributeType: "S"},
-        { AttributeName: "latestMediaCreatedAt", AttributeType: "N" }
-      ],
-      GlobalSecondaryIndexUpdates: [
-        {
-          Create: {
-            IndexName: "latestCreatedMediaIndex",
-            KeySchema: [
-              {AttributeName: "instagramOwner", KeyType: "HASH"},
-              {AttributeName: "latestMediaCreatedAt", KeyType: "RANGE"},
-            ],
-            Projection: {
-              "ProjectionType": "ALL"
-            },
-            ProvisionedThroughput: {
-              "ReadCapacityUnits": 1,"WriteCapacityUnits": 1
-            }
-          }
-        }
-      ]
-    };
-
     // TODO: This doesn't appear to work. Use the following command to verify creation
     // `aws dynamodb describe-table --table-name Instagrow-Users --endpoint-url http://localhost:8000`
     return this.db.updateTable(DELETE_INDEX_LAST_INTERACTION).promise()
@@ -145,13 +109,7 @@ class DynamoDBService {
         console.log(err);
         new Promise.resolve(err);
       })
-      .then((data) => this.db.updateTable(DELETE_INDEX_LATEST_MEDIA).promise())
-      .catch((err) => {
-        console.log(err);
-        new Promise.resolve(err);
-      })
       .then((data) => this.db.updateTable(CREATE_INDEX_LAST_INTERACTION).promise())
-      .then((data) => this.db.updateTable(CREATE_INDEX_LATEST_MEDIA).promise())
   }
 
   deleteDB() {
@@ -182,9 +140,9 @@ class DynamoDBService {
 
       this.docClient.put(params, (err, data) => {
         if (err) {
-          console.error("Unable to add user", user.instagramId, ". Error JSON:", JSON.stringify(err, null, 2));
+          console.error(`Unable to add user ${user.username} (${user.instagramId}). Error JSON: ${JSON.stringify(err, null, 2)}`);
         } else {
-          console.log("PutItem succeeded:", user.instagramId);
+          console.log(`Imported ${user.username} (${user.instagramId})`);
         }
       });
     });
@@ -255,12 +213,9 @@ class DynamoDBService {
   getAccountsToBeLiked() {
     const maximumAgeOfContentConsidered = moment().subtract(1, 'w');
     const interactionAgeThreshold = moment().subtract(this.followingInteractionDeltaInDays, 'd');
-    console.log(maximumAgeOfContentConsidered);
-    console.log(interactionAgeThreshold);
 
     const params = {
       TableName: this.usersTable,
-      IndexName: "latestCreatedMediaIndex",
       KeyConditionExpression:
         "instagramOwner = :io",
       FilterExpression:
