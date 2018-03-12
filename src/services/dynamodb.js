@@ -51,7 +51,33 @@ class DynamoDBService {
       }
     };
 
-    const UPDATE_SCRIPT = {
+    return this.db.createTable(CREATE_SCRIPT).promise()
+      .then((data) => {
+        return this.updateIndexes();
+      })
+      .then((data) => {
+        console.log("Created table. Table description JSON:", JSON.stringify(data, null, 2));
+        return new Promise.resolve(data);
+      })
+      .catch((err) => {
+        console.error("Unable to create table. Error JSON:", JSON.stringify(err, null, 2));
+        return new Promise.reject(err);
+      });
+  }
+
+  updateIndexes() {
+    const DELETE_INDEX_LAST_INTERACTION = {
+      TableName : this.usersTable,
+      GlobalSecondaryIndexUpdates: [
+        {
+          Delete: {
+            IndexName: "lastInteractionIndex",
+          }
+        }
+      ]
+    };
+
+    const CREATE_INDEX_LAST_INTERACTION = {
       TableName : this.usersTable,
       AttributeDefinitions: [
         { AttributeName: "instagramOwner", AttributeType: "S"},
@@ -76,19 +102,56 @@ class DynamoDBService {
       ]
     };
 
-    return this.db.createTable(CREATE_SCRIPT).promise()
-      .then((data) => {
-        this.db.updateTable(UPDATE_SCRIPT).promise()
-        return new Promise.resolve(data);
-      })
-      .then((data) => {
-        console.log("Created table. Table description JSON:", JSON.stringify(data, null, 2));
-        return new Promise.resolve(data);
-      })
+    const DELETE_INDEX_LATEST_MEDIA = {
+      TableName : this.usersTable,
+      GlobalSecondaryIndexUpdates: [
+        {
+          Delete: {
+            IndexName: "latestCreatedMediaIndex",
+          }
+        }
+      ]
+    };
+
+    const CREATE_INDEX_LATEST_MEDIA = {
+      TableName : this.usersTable,
+      AttributeDefinitions: [
+        { AttributeName: "instagramOwner", AttributeType: "S"},
+        { AttributeName: "latestMediaCreatedAt", AttributeType: "N" }
+      ],
+      GlobalSecondaryIndexUpdates: [
+        {
+          Create: {
+            IndexName: "latestCreatedMediaIndex",
+            KeySchema: [
+              {AttributeName: "instagramOwner", KeyType: "HASH"},
+              {AttributeName: "latestMediaCreatedAt", KeyType: "RANGE"},
+            ],
+            Projection: {
+              "ProjectionType": "ALL"
+            },
+            ProvisionedThroughput: {
+              "ReadCapacityUnits": 1,"WriteCapacityUnits": 1
+            }
+          }
+        }
+      ]
+    };
+
+    // TODO: This doesn't appear to work. Use the following command to verify creation
+    // `aws dynamodb describe-table --table-name Instagrow-Users --endpoint-url http://localhost:8000`
+    return this.db.updateTable(DELETE_INDEX_LAST_INTERACTION).promise()
       .catch((err) => {
-        console.error("Unable to create table. Error JSON:", JSON.stringify(err, null, 2));
-        return new Promise.reject(err);
-      });
+        console.log(err);
+        new Promise.resolve(err);
+      })
+      .then((data) => this.db.updateTable(DELETE_INDEX_LATEST_MEDIA).promise())
+      .catch((err) => {
+        console.log(err);
+        new Promise.resolve(err);
+      })
+      .then((data) => this.db.updateTable(CREATE_INDEX_LAST_INTERACTION).promise())
+      .then((data) => this.db.updateTable(CREATE_INDEX_LATEST_MEDIA).promise())
   }
 
   deleteDB() {
@@ -197,6 +260,7 @@ class DynamoDBService {
 
     const params = {
       TableName: this.usersTable,
+      IndexName: "latestCreatedMediaIndex",
       KeyConditionExpression:
         "instagramOwner = :io",
       FilterExpression:
