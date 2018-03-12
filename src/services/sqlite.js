@@ -1,9 +1,8 @@
 const Promise = require('bluebird');
 const sqlite3 = Promise.promisifyAll(require('sqlite3').verbose());
+const fs = require('fs');
 const humps = require('humps');
 const moment = require('moment');
-
-const INTERACTION_DELTA_IN_DAYS = 3;
 
 class SqliteService {
   constructor(config) {
@@ -13,9 +12,10 @@ class SqliteService {
         throw err;
       }
     });
+    this.followingInteractionDeltaInDays = config.followingInteractionDeltaInDays || constants.settings.FOLLOWING_INTERACTION_DELTA_IN_DAYS
   };
 
-  create() {
+  createDB() {
     this.db.run(`CREATE TABLE IF NOT EXISTS accounts (
               instagram_id integer PRIMARY KEY,
               username text NOT NULL,
@@ -26,6 +26,19 @@ class SqliteService {
             );`);
     console.log('Created Database successfully.');
   };
+
+  dumpAllDataToCSV() {
+    this.db.all(`SELECT * FROM accounts;`, [], (err, rows) => {
+      if (err) {
+        throw err;
+      }
+
+      fs.writeFile(`data/dump-${this.config.username}.json`, JSON.stringify(rows), (err) => {
+          if (err) throw err;
+          console.log('Data saved!');
+      });
+    });
+  }
 
   getAccountsPossiblyRequiringInteraction() {
     const sql = `SELECT
@@ -41,7 +54,7 @@ class SqliteService {
                   last_interaction_at < ?
                 OR last_interaction_at IS NULL`;
 
-    return this.db.allAsync(sql, [moment().subtract(INTERACTION_DELTA_IN_DAYS, 'd')])
+    return this.db.allAsync(sql, [moment().subtract(this.followingInteractionDeltaInDays, 'd')])
             .then(row => humps.camelizeKeys(row));
   };
 
@@ -75,7 +88,7 @@ class SqliteService {
       sql, [
         maximumAgeOfContentConsidered.valueOf(),
         maximumAgeOfContentConsidered.valueOf(),
-        moment().subtract(INTERACTION_DELTA_IN_DAYS, 'd'),
+        moment().subtract(this.followingInteractionDeltaInDays, 'd'),
       ]
     ).then(row => humps.camelizeKeys(row));
   };

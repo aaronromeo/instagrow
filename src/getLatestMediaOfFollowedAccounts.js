@@ -3,11 +3,10 @@ const _ = require('lodash');
 const Promise = require('bluebird');
 
 const sessionSingleton = require("./services/sessionSingleton");
-const sqliteService = require("./services/sqlite");
 
-exports.getLatestMediaOfFollowedAccounts = (config) => sessionSingleton.session.createSession(config)
+exports.getLatestMediaOfFollowedAccounts = (config, db) => sessionSingleton.session.createSession(config)
   .then((session) => {
-    const accountsFollowing = sqliteService.handler.getInstance().getAccountsPossiblyRequiringInteraction();
+    const accountsFollowing = db.handler.getInstance().getAccountsPossiblyRequiringInteraction();
     return [session, accountsFollowing]
   })
   .spread((session, accountsFollowing) => {
@@ -29,19 +28,19 @@ exports.getLatestMediaOfFollowedAccounts = (config) => sessionSingleton.session.
       };
       if (medias[0]._params.hasLiked) {
         return Promise.all([
-          sqliteService.handler.getInstance().updateLatestMediaDetails(
+          db.handler.getInstance().updateLatestMediaDetails(
             medias[0]._params.user.pk,
             medias[0]._params.id,
             medias[0]._params.webLink,
             medias[0]._params.takenAt,
           ),
-          sqliteService.handler.getInstance().updateLastInteration(
+          db.handler.getInstance().updateLastInteration(
             medias[0]._params.user.pk,
             medias[0]._params.takenAt,
           ),
         ]);
       } else {
-        return sqliteService.handler.getInstance().updateLatestMediaDetails(
+        return db.handler.getInstance().updateLatestMediaDetails(
           medias[0]._params.user.pk,
           medias[0]._params.id,
           medias[0]._params.webLink,
