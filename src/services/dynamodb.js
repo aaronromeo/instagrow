@@ -30,6 +30,7 @@ class DynamoDBService {
     this.docClient = new AWS.DynamoDB.DocumentClient();
     this.followingInteractionDeltaInDays = config.followingInteractionDeltaInDays || constants.settings.FOLLOWING_INTERACTION_DELTA_IN_DAYS
     this.userTableName = `Instagrow-${this.config.username}-Users`;
+    this.pendingMediaTableName = `Instagrow-${this.config.username}-Media-Pending-Likes`;
 
     this.addAccountOrUpdateUsername.bind(this);
   };
@@ -49,23 +50,27 @@ class DynamoDBService {
       }
     };
 
-    // const CREATE_USERS_TABLE_SCRIPT = {
-// ???      TableName : "Instagrow-Media-Pending-Likes",
-      // KeySchema: [
-        // { AttributeName: "instagramOwner", KeyType: "HASH"},
-        // { AttributeName: "instagramId", KeyType: "RANGE"}
-      // ],
-      // AttributeDefinitions: [
-        // { AttributeName: "instagramOwner", AttributeType: "S" },
-        // { AttributeName: "instagramId", AttributeType: "S" }
-      // ],
-      // ProvisionedThroughput: {
-        // ReadCapacityUnits: 1,
-        // WriteCapacityUnits: 1
-      // }
-    // };
+    const CREATE_PENDING_MEDIA_TABLE_SCRIPT = {
+      TableName : this.pendingMediaTableName,
+      KeySchema: [
+        { AttributeName: "mediaId", KeyType: "HASH"},
+        { AttributeName: "instagramId", KeyType: "RANGE"}
+      ],
+      AttributeDefinitions: [
+        { AttributeName: "mediaId", AttributeType: "S" },
+        { AttributeName: "instagramId", AttributeType: "S" }
+      ],
+      ProvisionedThroughput: {
+        ReadCapacityUnits: 1,
+        WriteCapacityUnits: 1
+      }
+    };
 
     return this.db.createTable(CREATE_USERS_TABLE_SCRIPT).promise()
+      .then((data) => {
+        console.log("Created table. Table description JSON:", JSON.stringify(data, null, 2));
+        return this.db.createTable(CREATE_PENDING_MEDIA_TABLE_SCRIPT).promise()
+      })
       .then((data) => {
         console.log("Created table. Table description JSON:", JSON.stringify(data, null, 2));
         return new Promise.resolve(data);
@@ -78,6 +83,10 @@ class DynamoDBService {
 
   deleteDB() {
     return this.db.deleteTable({TableName : this.userTableName}).promise()
+      .then((data) => {
+        console.log("Deleted table. Table description JSON:", JSON.stringify(data, null, 2));
+        return this.db.deleteTable({TableName : this.pendingMediaTableName}).promise();
+      })
       .then((data) => {
         console.log("Deleted table. Table description JSON:", JSON.stringify(data, null, 2));
         return new Promise.resolve(data);
@@ -269,7 +278,7 @@ class DynamoDBService {
   addAccountOrUpdateUsername(instagramId, username) {
     return this.getAccountByInstagramId(instagramId)
       .then((account) => {
-        if (account && account) {
+        if (account) {
           const params = {
             TableName: this.userTableName,
             Key: {instagramId: instagramId.toString()},
@@ -294,6 +303,46 @@ class DynamoDBService {
             });
         }
       })
+  }
+
+  addLatestMediaToPendingTable(instagramId, mediaId, mediaUrl, username) {
+    const params = {
+      TableName: this.pendingMediaTableName,
+      Item: {
+        instagramId: instagramId.toString(),
+        mediaId,
+        mediaUrl,
+        username,
+      },
+    };
+    return this.docClient.put(params).promise()
+      .then(() => {
+        return new Promise.resolve({instagramId, mediaId})
+      });
+  }
+
+  getLatestMediaFromPendingTable() {
+    const params = {
+      TableName: this.pendingMediaTableName,
+    };
+    return this.docClient.scan(params).promise()
+      .then((data) => {
+        return new Promise.resolve(data.Items)
+      });
+  }
+
+  deleteMediaFromPendingTable(instagramId, mediaId) {
+    const params = {
+      TableName: this.pendingMediaTableName,
+      Key: {
+        instagramId,
+        mediaId,
+      }
+    };
+    return this.docClient.delete(params).promise()
+      .then((data) => {
+        return new Promise.resolve(data.Items)
+      });
   }
 
   updateLatestMediaDetails(instagramId, latestMediaId, latestMediaUrl, latestMediaCreatedAt) {

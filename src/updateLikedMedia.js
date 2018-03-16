@@ -9,10 +9,11 @@ const MIN_DELAY = 2000;
 const MAX_DELAY = 10000;
 
 const likeMedia = (session, account, db) => {
-  console.log(`Liking ${account.username}\t(${account.instagramId})\t${account.latestMediaUrl} at ${moment()}`)
+  console.log(`Liking ${account.username}\t(${account.instagramId})\t${account.mediaUrl} at ${moment()}`)
   return [
-    new Client.Like.create(session, account.latestMediaId),
-    db.handler.getInstance().updateLastInteration(account.instagramId, moment().valueOf())
+    new Client.Like.create(session, account.mediaId),
+    db.handler.getInstance().updateLastInteration(account.instagramId, moment().valueOf()),
+    db.handler.getInstance().deleteMediaFromPendingTable(account.instagramId, account.mediaId),
   ];
 }
 
@@ -24,20 +25,22 @@ const getRandomInt = (min, max) => {
 
 exports.updateLikedMedia = (config, db) => sessionSingleton.session.createSession(config)
   .then((session) => {
-    const accountsToBeLiked = db.handler.getInstance().getAccountsToBeLiked();
-    return [session, accountsToBeLiked]
+    const mediaToBeLiked = db.handler.getInstance().getLatestMediaFromPendingTable();
+    return [session, mediaToBeLiked]
   })
-  .spread((session, accountsToBeLiked) => {
-    if (accountsToBeLiked.length) {
+  .spread((session, mediaToBeLiked) => {
+    console.log(mediaToBeLiked);
+
+    if (mediaToBeLiked.length) {
       console.log("Bot will like the following accounts");
-      accountsToBeLiked.forEach(account =>
-        console.log(`${account.username}\t(${account.instagramId})\t${account.latestMediaUrl}`)
+      mediaToBeLiked.forEach(media =>
+        console.log(`${media.username}\t(${media.instagramId})\t${media.mediaUrl}`)
       );
     }
     let nextRun = 0;
     console.log();
-    return Promise.mapSeries(_.shuffle(accountsToBeLiked), accountToBeInteractedWith => {
+    return Promise.mapSeries(_.shuffle(mediaToBeLiked), mediaToBeInteractedWith => {
       nextRun = getRandomInt(MIN_DELAY, MAX_DELAY);
-      return Promise.delay(nextRun).then(() => likeMedia(session, accountToBeInteractedWith, db));
+      return Promise.delay(nextRun).then(() => likeMedia(session, mediaToBeInteractedWith, db));
     });
   })

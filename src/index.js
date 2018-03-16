@@ -109,6 +109,25 @@ commander
   });
 
 commander
+  .command('addFollowingPendingLikeMediaToQueue <username>')
+  .alias('a')
+  .description('Queue media requiring "like" interactions for followed accounts who have posted content in the last 3-7 days')
+  .action((username) => {
+    const config = require(`../config.${username}.json`);
+    const accountsFollowing = require("./getAccountsFollowing");
+    const latestActivityOfFollowedAccounts = require("./getLatestActivityOfFollowedAccounts");
+    const latestMediaOfFollowedAccounts = require("./getLatestMediaOfFollowedAccounts");
+    const followingPendingLikeMediaToQueue = require("./addFollowingPendingLikeMediaToQueue");
+
+    constants.settings.DATABASE_OBJECT.handler.createInstance(config);
+    accountsFollowing.getAccountsFollowing(config, constants.settings.DATABASE_OBJECT)
+      .then(() => latestActivityOfFollowedAccounts.getLatestActivityOfFollowedAccounts(config, constants.settings.DATABASE_OBJECT))
+      .then(() => latestMediaOfFollowedAccounts.getLatestMediaOfFollowedAccounts(config, constants.settings.DATABASE_OBJECT))
+      .then(() => followingPendingLikeMediaToQueue.addFollowingPendingLikeMediaToQueue(config, constants.settings.DATABASE_OBJECT))
+      .finally(() => constants.settings.DATABASE_OBJECT.handler.getInstance().close());
+  });
+
+commander
   .command('likeMedia <username>')
   .alias('l')
   .description('Create "like" interactions for followed accounts who have posted content in the last 3-7 days')
@@ -120,10 +139,7 @@ commander
     const likedMedia = require("./updateLikedMedia");
 
     constants.settings.DATABASE_OBJECT.handler.createInstance(config);
-    accountsFollowing.getAccountsFollowing(config, constants.settings.DATABASE_OBJECT)
-      .then(() => latestActivityOfFollowedAccounts.getLatestActivityOfFollowedAccounts(config, constants.settings.DATABASE_OBJECT))
-      .then(() => latestMediaOfFollowedAccounts.getLatestMediaOfFollowedAccounts(config, constants.settings.DATABASE_OBJECT))
-      .then(() => likedMedia.updateLikedMedia(config, constants.settings.DATABASE_OBJECT))
+    likedMedia.updateLikedMedia(config, constants.settings.DATABASE_OBJECT)
       .finally(() => constants.settings.DATABASE_OBJECT.handler.getInstance().close());
   });
 
