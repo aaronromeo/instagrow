@@ -4,16 +4,15 @@ const _ = require('lodash');
 const moment = require('moment');
 
 const sessionSingleton = require("./services/sessionSingleton");
-const databaseService = require("./services/database");
 
 const MIN_DELAY = 2000;
 const MAX_DELAY = 10000;
 
-const likeMedia = (session, account) => {
+const likeMedia = (session, account, db) => {
   console.log(`Liking ${account.username}\t(${account.instagramId})\t${account.latestMediaUrl} at ${moment()}`)
   return [
     new Client.Like.create(session, account.latestMediaId),
-    databaseService.handler.getInstance().updateLastInteration(account.instagramId, moment().valueOf())
+    db.handler.getInstance().updateLastInteration(account.instagramId, moment().valueOf())
   ];
 }
 
@@ -23,9 +22,9 @@ const getRandomInt = (min, max) => {
   return Math.floor(Math.random() * (max - min)) + min; //The maximum is exclusive and the minimum is inclusive
 }
 
-exports.updateLikedMedia = (config) => sessionSingleton.session.createSession(config)
+exports.updateLikedMedia = (config, db) => sessionSingleton.session.createSession(config)
   .then((session) => {
-    const accountsToBeLiked = databaseService.handler.getInstance().getAccountsToBeLiked();
+    const accountsToBeLiked = db.handler.getInstance().getAccountsToBeLiked();
     return [session, accountsToBeLiked]
   })
   .spread((session, accountsToBeLiked) => {
@@ -39,6 +38,6 @@ exports.updateLikedMedia = (config) => sessionSingleton.session.createSession(co
     console.log();
     return Promise.mapSeries(_.shuffle(accountsToBeLiked), accountToBeInteractedWith => {
       nextRun = getRandomInt(MIN_DELAY, MAX_DELAY);
-      return Promise.delay(nextRun).then(() => likeMedia(session, accountToBeInteractedWith));
+      return Promise.delay(nextRun).then(() => likeMedia(session, accountToBeInteractedWith, db));
     });
   })

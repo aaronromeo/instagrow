@@ -2,9 +2,8 @@ const Client = require('instagram-private-api').V1;
 const Promise = require('bluebird');
 
 const sessionSingleton = require("./services/sessionSingleton");
-const databaseService = require("./services/database");
 
-exports.getAccountsFollowing = (config) => sessionSingleton.session.createSession(config)
+exports.getAccountsFollowing = (config, db) => sessionSingleton.session.createSession(config)
   .then((session) => {
     return [session, session.getAccountId()];
   })
@@ -17,7 +16,7 @@ exports.getAccountsFollowing = (config) => sessionSingleton.session.createSessio
   .then((followingResults) => {
     return Promise.map(
       followingResults,
-      user => databaseService.handler.getInstance().addAccountOrUpdateUsername(user.id, user._params.username)
+      user => db.handler.getInstance().addAccountOrUpdateUsername(user.id, user._params.username)
     );
   })
   .then((accountRows) => {
