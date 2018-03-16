@@ -206,7 +206,7 @@ class DynamoDBService {
                 username: record.username,
               })
             })
-            dataMarshal.exportData(`data/dump-${this.config.username}.json`);
+            dataMarshal.exportData(`data/dump-dynamodb.json`);
             return new Promise.resolve(data);
           })
           .catch((err) => {

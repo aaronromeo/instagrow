@@ -18,15 +18,27 @@ commander
   });
 
 commander
-  .command('dumpFromSqliteDatabase <username>')
-  .alias('ds')
-  .description('Dump the Sqlite Instagram database to a file in data/')
+  .command('exportFromSqliteDatabase <username>')
+  .alias('es')
+  .description('Export the Sqlite Instagram database to a file in data/')
   .action((username) => {
     const config = require(`../config.${username}.json`);
     const sqliteService = require("./services/sqlite");
 
     sqliteService.handler.createInstance(config);
     sqliteService.handler.getInstance().dumpAllDataToCSV();
+  });
+
+commander
+  .command('exportFromDynamoDB <username>')
+  .alias('ed')
+  .description('Export the DynamoDB Instagram database to a file in data/')
+  .action((username) => {
+    const config = require(`../config.${username}.json`);
+    const dynamodbService = require("./services/dynamodb");
+
+    dynamodbService.handler.createInstance(config);
+    dynamodbService.handler.getInstance().exportData();
   });
 
 commander
@@ -38,7 +50,7 @@ commander
     const dynamodbService = require("./services/dynamodb");
 
     dynamodbService.handler.createInstance(config);
-    dynamodbService.handler.getInstance().importSqliteData();
+    dynamodbService.handler.getInstance().importData();
   });
 
 commander
