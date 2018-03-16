@@ -18,15 +18,27 @@ commander
   });
 
 commander
-  .command('dumpFromSqliteDatabase <username>')
-  .alias('ds')
-  .description('Dump the Sqlite Instagram database to a file in data/')
+  .command('exportFromSqliteDatabase <username>')
+  .alias('es')
+  .description('Export the Sqlite Instagram database to a file in data/')
   .action((username) => {
     const config = require(`../config.${username}.json`);
     const sqliteService = require("./services/sqlite");
 
     sqliteService.handler.createInstance(config);
     sqliteService.handler.getInstance().dumpAllDataToCSV();
+  });
+
+commander
+  .command('exportFromDynamoDB <username>')
+  .alias('ed')
+  .description('Export the DynamoDB Instagram database to a file in data/')
+  .action((username) => {
+    const config = require(`../config.${username}.json`);
+    const dynamodbService = require("./services/dynamodb");
+
+    dynamodbService.handler.createInstance(config);
+    dynamodbService.handler.getInstance().exportData();
   });
 
 commander
@@ -38,7 +50,7 @@ commander
     const dynamodbService = require("./services/dynamodb");
 
     dynamodbService.handler.createInstance(config);
-    dynamodbService.handler.getInstance().importSqliteData();
+    dynamodbService.handler.getInstance().importData();
   });
 
 commander
@@ -97,6 +109,25 @@ commander
   });
 
 commander
+  .command('addFollowingPendingLikeMediaToQueue <username>')
+  .alias('a')
+  .description('Queue media requiring "like" interactions for followed accounts who have posted content in the last 3-7 days')
+  .action((username) => {
+    const config = require(`../config.${username}.json`);
+    const accountsFollowing = require("./getAccountsFollowing");
+    const latestActivityOfFollowedAccounts = require("./getLatestActivityOfFollowedAccounts");
+    const latestMediaOfFollowedAccounts = require("./getLatestMediaOfFollowedAccounts");
+    const followingPendingLikeMediaToQueue = require("./addFollowingPendingLikeMediaToQueue");
+
+    constants.settings.DATABASE_OBJECT.handler.createInstance(config);
+    accountsFollowing.getAccountsFollowing(config, constants.settings.DATABASE_OBJECT)
+      .then(() => latestActivityOfFollowedAccounts.getLatestActivityOfFollowedAccounts(config, constants.settings.DATABASE_OBJECT))
+      .then(() => latestMediaOfFollowedAccounts.getLatestMediaOfFollowedAccounts(config, constants.settings.DATABASE_OBJECT))
+      .then(() => followingPendingLikeMediaToQueue.addFollowingPendingLikeMediaToQueue(config, constants.settings.DATABASE_OBJECT))
+      .finally(() => constants.settings.DATABASE_OBJECT.handler.getInstance().close());
+  });
+
+commander
   .command('likeMedia <username>')
   .alias('l')
   .description('Create "like" interactions for followed accounts who have posted content in the last 3-7 days')
@@ -108,10 +139,7 @@ commander
     const likedMedia = require("./updateLikedMedia");
 
     constants.settings.DATABASE_OBJECT.handler.createInstance(config);
-    accountsFollowing.getAccountsFollowing(config, constants.settings.DATABASE_OBJECT)
-      .then(() => latestActivityOfFollowedAccounts.getLatestActivityOfFollowedAccounts(config, constants.settings.DATABASE_OBJECT))
-      .then(() => latestMediaOfFollowedAccounts.getLatestMediaOfFollowedAccounts(config, constants.settings.DATABASE_OBJECT))
-      .then(() => likedMedia.updateLikedMedia(config, constants.settings.DATABASE_OBJECT))
+    likedMedia.updateLikedMedia(config, constants.settings.DATABASE_OBJECT)
       .finally(() => constants.settings.DATABASE_OBJECT.handler.getInstance().close());
   });
 

@@ -7,8 +7,7 @@ const moment = require('moment');
 const constants = require("../constants");
 const dataMarshalService = require("./dataMarshal");
 
-const USER_INITIAL_RECORD = (instagramOwner, instagramId, username) => ({
-  instagramOwner,
+const USER_INITIAL_RECORD = (instagramId, username) => ({
   instagramId: instagramId.toString(),
   username,
   lastInteractionAt: 0,
@@ -30,19 +29,19 @@ class DynamoDBService {
     this.db = new AWS.DynamoDB();
     this.docClient = new AWS.DynamoDB.DocumentClient();
     this.followingInteractionDeltaInDays = config.followingInteractionDeltaInDays || constants.settings.FOLLOWING_INTERACTION_DELTA_IN_DAYS
+    this.userTableName = `Instagrow-${this.config.username}-Users`;
+    this.pendingMediaTableName = `Instagrow-${this.config.username}-Media-Pending-Likes`;
 
     this.addAccountOrUpdateUsername.bind(this);
   };
 
   createDB() {
-    const CREATE_SCRIPT = {
-      TableName : "Instagrow-Users",
+    const CREATE_USERS_TABLE_SCRIPT = {
+      TableName : this.userTableName,
       KeySchema: [
-        { AttributeName: "instagramOwner", KeyType: "HASH"},
-        { AttributeName: "instagramId", KeyType: "RANGE"}
+        { AttributeName: "instagramId", KeyType: "HASH"}
       ],
       AttributeDefinitions: [
-        { AttributeName: "instagramOwner", AttributeType: "S" },
         { AttributeName: "instagramId", AttributeType: "S" }
       ],
       ProvisionedThroughput: {
@@ -51,9 +50,26 @@ class DynamoDBService {
       }
     };
 
-    return this.db.createTable(CREATE_SCRIPT).promise()
+    const CREATE_PENDING_MEDIA_TABLE_SCRIPT = {
+      TableName : this.pendingMediaTableName,
+      KeySchema: [
+        { AttributeName: "mediaId", KeyType: "HASH"},
+        { AttributeName: "instagramId", KeyType: "RANGE"}
+      ],
+      AttributeDefinitions: [
+        { AttributeName: "mediaId", AttributeType: "S" },
+        { AttributeName: "instagramId", AttributeType: "S" }
+      ],
+      ProvisionedThroughput: {
+        ReadCapacityUnits: 1,
+        WriteCapacityUnits: 1
+      }
+    };
+
+    return this.db.createTable(CREATE_USERS_TABLE_SCRIPT).promise()
       .then((data) => {
-        return this.updateIndexes();
+        console.log("Created table. Table description JSON:", JSON.stringify(data, null, 2));
+        return this.db.createTable(CREATE_PENDING_MEDIA_TABLE_SCRIPT).promise()
       })
       .then((data) => {
         console.log("Created table. Table description JSON:", JSON.stringify(data, null, 2));
@@ -65,55 +81,12 @@ class DynamoDBService {
       });
   }
 
-  updateIndexes() {
-    const DELETE_INDEX_LAST_INTERACTION = {
-      TableName : "Instagrow-Users",
-      GlobalSecondaryIndexUpdates: [
-        {
-          Delete: {
-            IndexName: "lastInteractionIndex",
-          }
-        }
-      ]
-    };
-
-    const CREATE_INDEX_LAST_INTERACTION = {
-      TableName : "Instagrow-Users",
-      AttributeDefinitions: [
-        { AttributeName: "instagramOwner", AttributeType: "S"},
-        { AttributeName: "lastInteractionAt", AttributeType: "N" }
-      ],
-      GlobalSecondaryIndexUpdates: [
-        {
-          Create: {
-            IndexName: "lastInteractionIndex",
-            KeySchema: [
-              {AttributeName: "instagramOwner", KeyType: "HASH"},
-              {AttributeName: "lastInteractionAt", KeyType: "RANGE"},
-            ],
-            Projection: {
-              "ProjectionType": "ALL"
-            },
-            ProvisionedThroughput: {
-              "ReadCapacityUnits": 1,"WriteCapacityUnits": 1
-            }
-          }
-        }
-      ]
-    };
-
-    // TODO: This doesn't appear to work. Use the following command to verify creation
-    // `aws dynamodb describe-table --table-name Instagrow-Users --endpoint-url http://localhost:8000`
-    return this.db.updateTable(DELETE_INDEX_LAST_INTERACTION).promise()
-      .catch((err) => {
-        console.log(err);
-        new Promise.resolve(err);
-      })
-      .then((data) => this.db.updateTable(CREATE_INDEX_LAST_INTERACTION).promise())
-  }
-
   deleteDB() {
-    return this.db.deleteTable({TableName : "Instagrow-Users"}).promise()
+    return this.db.deleteTable({TableName : this.userTableName}).promise()
+      .then((data) => {
+        console.log("Deleted table. Table description JSON:", JSON.stringify(data, null, 2));
+        return this.db.deleteTable({TableName : this.pendingMediaTableName}).promise();
+      })
       .then((data) => {
         console.log("Deleted table. Table description JSON:", JSON.stringify(data, null, 2));
         return new Promise.resolve(data);
@@ -129,12 +102,11 @@ class DynamoDBService {
     allUsers.forEach((underscoreUser) => {
       const user = humps.camelizeKeys(underscoreUser);
       const params = {
-        TableName: "Instagrow-Users",
+        TableName: this.userTableName,
         Item: Object.assign({}, user, {
           instagramId: user.instagramId.toString(),
           lastInteractionAt: (user.lastInteractionAt || 0),
           latestMediaCreatedAt: (user.latestMediaCreatedAt || 0),
-          instagramOwner: this.config.username,
         }),
       };
 
@@ -149,10 +121,10 @@ class DynamoDBService {
   }
 
   createBackup() {
-    const backupName = `Instagrow-Users-Bkup-${moment().valueOf()}`
+    const backupName = `${this.userTableName}-Bkup-${moment().valueOf()}`
     const backupParams = {
       BackupName: backupName,
-      TableName: 'Instagrow-Users',
+      TableName: this.userTableName,
     };
 
     return this.db.createBackup(backupParams).promise()
@@ -163,18 +135,18 @@ class DynamoDBService {
   }
 
   importData() {
-    const backupName = `Instagrow-Users-Bkup-${moment().valueOf()}`
+    const backupName = `${this.userTableName}-Bkup-${moment().valueOf()}`
     const backupParams = {
       BackupName: backupName,
-      TableName: 'Instagrow-Users',
+      TableName: this.userTableName,
     };
 
     const dataMarshal = new dataMarshalService.service.DataMarshal();
-    dataMarshal.importData(`data/dump-dynamodb.json`);
+    dataMarshal.importData(`data/dump-${this.config.username}-dynamodb.json`);
 
     return Promise.map(dataMarshal.records, (record) => {
       const putParams = {
-        TableName: "Instagrow-Users",
+        TableName: this.userTableName,
         Item: record,
       };
 
@@ -189,7 +161,7 @@ class DynamoDBService {
   }
 
   exportData() {
-    return this.db.describeTable({ "TableName": "Instagrow-Users" }).promise()
+    return this.db.describeTable({ "TableName": this.userTableName }).promise()
       .then((tableDescription) => {
         console.log("Describe table successful. Table description JSON:", JSON.stringify(tableDescription, null, 2));
         return this.docClient.scan(tableDescription.Table).promise()
@@ -198,7 +170,6 @@ class DynamoDBService {
             data.Items.forEach((record) => {
               dataMarshal.addRecord({
                 lastInteractionAt: record.lastInteractionAt,
-                instagramOwner: record.instagramOwner,
                 instagramId: record.instagramId,
                 latestMediaId: record.latestMediaId,
                 latestMediaUrl: record.latestMediaUrl,
@@ -206,7 +177,7 @@ class DynamoDBService {
                 username: record.username,
               })
             })
-            dataMarshal.exportData(`data/dump-${this.config.username}.json`);
+            dataMarshal.exportData(`data/dump-${this.config.username}-dynamodb.json`);
             return new Promise.resolve(data);
           })
           .catch((err) => {
@@ -221,19 +192,17 @@ class DynamoDBService {
 
   getMediaWithLastInteraction() {
     const params = {
-      TableName: "Instagrow-Users",
-      IndexName: "lastInteractionIndex",
-      KeyConditionExpression:
-        "instagramOwner = :io AND lastInteractionAt > :li",
+      TableName: this.userTableName,
+      FilterExpression:
+        "lastInteractionAt > :li",
       ExpressionAttributeValues: {
-        ":io": this.config.username,
-        ":li": 0
+        ":li": 0,
       },
       Limit: 1,
       ScanIndexForward: false,
     };
 
-    return this.docClient.query(params).promise()
+    return this.docClient.scan(params).promise()
       .then((data) => {
         return new Promise.resolve(data.Items && data.Items[0]);
       })
@@ -244,10 +213,9 @@ class DynamoDBService {
 
   getAccountByInstagramId(instagramId) {
     const params = {
-      TableName: "Instagrow-Users",
+      TableName: this.userTableName,
       Key:{
         instagramId: instagramId.toString(),
-        instagramOwner: this.config.username,
       }
     };
 
@@ -262,17 +230,15 @@ class DynamoDBService {
 
   getAccountsPossiblyRequiringInteraction() {
     const params = {
-      TableName: "Instagrow-Users",
-      IndexName: "lastInteractionIndex",
-      KeyConditionExpression:
-        "instagramOwner = :io AND lastInteractionAt < :li",
+      TableName: this.userTableName,
+      FilterExpression:
+        "lastInteractionAt < :li",
       ExpressionAttributeValues: {
-        ":io": this.config.username,
         ":li": moment().subtract(this.followingInteractionDeltaInDays, 'd').valueOf(),
       },
     };
 
-    return this.docClient.query(params).promise()
+    return this.docClient.scan(params).promise()
       .then((data) => {
         return new Promise.resolve(data.Items);
       })
@@ -286,19 +252,16 @@ class DynamoDBService {
     const interactionAgeThreshold = moment().subtract(this.followingInteractionDeltaInDays, 'd');
 
     const params = {
-      TableName: "Instagrow-Users",
-      KeyConditionExpression:
-        "instagramOwner = :io",
+      TableName: this.userTableName,
       FilterExpression:
         "latestMediaCreatedAt > :lmca AND lastInteractionAt < latestMediaCreatedAt AND lastInteractionAt < :li",
       ExpressionAttributeValues: {
-        ":io": this.config.username,
         ":lmca": maximumAgeOfContentConsidered.valueOf(),
         ":li": interactionAgeThreshold.valueOf(),
       },
     };
 
-    return this.docClient.query(params).promise()
+    return this.docClient.scan(params).promise()
       .then((data) => {
         const item = data.Items.find(item => item.latestMediaCreatedAt < maximumAgeOfContentConsidered.valueOf() ||
           item.lastInteractionAt > item.latestMediaCreatedAt ||
@@ -315,10 +278,10 @@ class DynamoDBService {
   addAccountOrUpdateUsername(instagramId, username) {
     return this.getAccountByInstagramId(instagramId)
       .then((account) => {
-        if (account && account) {
+        if (account) {
           const params = {
-            TableName: "Instagrow-Users",
-            Key: {instagramOwner: this.config.username, instagramId: instagramId.toString()},
+            TableName: this.userTableName,
+            Key: {instagramId: instagramId.toString()},
             UpdateExpression: "set username = :u",
             ExpressionAttributeValues:{
               ":u": username
@@ -331,7 +294,7 @@ class DynamoDBService {
             });
         } else {
           const params = {
-            TableName: "Instagrow-Users",
+            TableName: this.userTableName,
             Item: USER_INITIAL_RECORD(this.config.username, instagramId, username)
           };
           return this.docClient.put(params).promise()
@@ -342,10 +305,53 @@ class DynamoDBService {
       })
   }
 
+  addLatestMediaToPendingTable(instagramId, mediaId, mediaUrl, username) {
+    const params = {
+      TableName: this.pendingMediaTableName,
+      Item: {
+        instagramId: instagramId.toString(),
+        mediaId,
+        mediaUrl,
+        username,
+      },
+    };
+    return this.docClient.put(params).promise()
+      .then(() => {
+        return new Promise.resolve({instagramId, mediaId})
+      });
+  }
+
+  getLatestMediaFromPendingTable(limit=null) {
+    const params = {
+      TableName: this.pendingMediaTableName,
+    };
+    if (limit) {
+      params['Limit'] = limit;
+    }
+    return this.docClient.scan(params).promise()
+      .then((data) => {
+        return new Promise.resolve(data.Items)
+      });
+  }
+
+  deleteMediaFromPendingTable(instagramId, mediaId) {
+    const params = {
+      TableName: this.pendingMediaTableName,
+      Key: {
+        instagramId,
+        mediaId,
+      }
+    };
+    return this.docClient.delete(params).promise()
+      .then((data) => {
+        return new Promise.resolve(data.Items)
+      });
+  }
+
   updateLatestMediaDetails(instagramId, latestMediaId, latestMediaUrl, latestMediaCreatedAt) {
     const params = {
-      TableName: "Instagrow-Users",
-      Key: {instagramOwner: this.config.username, instagramId: instagramId.toString()},
+      TableName: this.userTableName,
+      Key: {instagramId: instagramId.toString()},
       UpdateExpression: "set latestMediaId = :lmi, latestMediaUrl = :lmu, latestMediaCreatedAt = :lmca",
       ExpressionAttributeValues:{
         ":lmi": latestMediaId,
@@ -360,8 +366,8 @@ class DynamoDBService {
 
   updateLastInteration(instagramId, latestInteraction) {
     const params = {
-      TableName: "Instagrow-Users",
-      Key: {instagramOwner: this.config.username, instagramId: instagramId.toString()},
+      TableName: this.userTableName,
+      Key: {instagramId: instagramId.toString()},
       UpdateExpression: "set lastInteractionAt = :li",
       ExpressionAttributeValues:{
         ":li": latestInteraction,
