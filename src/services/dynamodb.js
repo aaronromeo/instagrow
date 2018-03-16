@@ -321,10 +321,13 @@ class DynamoDBService {
       });
   }
 
-  getLatestMediaFromPendingTable() {
+  getLatestMediaFromPendingTable(limit=null) {
     const params = {
       TableName: this.pendingMediaTableName,
     };
+    if (limit) {
+      params['Limit'] = limit;
+    }
     return this.docClient.scan(params).promise()
       .then((data) => {
         return new Promise.resolve(data.Items)
