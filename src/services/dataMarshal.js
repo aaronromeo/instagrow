@@ -1,14 +1,14 @@
 const Promise = require('bluebird');
+const fs = require('fs');
 
 class DataMarshal {
   constructor() {
     this._records = [];
   };
 
-  addRecord({instagramOwner, instagramId, lastInteractionAt, latestMediaId, latestMediaUrl, latestMediaCreatedAt, username} = {}) {
+  addRecord({instagramId, lastInteractionAt, latestMediaId, latestMediaUrl, latestMediaCreatedAt, username} = {}) {
     this._records.push({
       lastInteractionAt: lastInteractionAt || 0,
-      instagramOwner,
       instagramId: instagramId.toString(),
       latestMediaId,
       latestMediaUrl,
@@ -27,7 +27,6 @@ class DataMarshal {
   importData(filename) {
     JSON.parse(fs.readFileSync(filename, 'utf8')).forEach(record => {
       const {
-        instagramOwner,
         instagramId,
         lastInteractionAt,
         latestMediaId,
@@ -37,7 +36,6 @@ class DataMarshal {
       } = record;
 
       this.addRecord({
-        instagramOwner,
         instagramId,
         lastInteractionAt,
         latestMediaId,
