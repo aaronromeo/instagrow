@@ -38,7 +38,7 @@ commander
     const dynamodbService = require("./services/dynamodb");
 
     dynamodbService.handler.createInstance(config);
-    dynamodbService.handler.getInstance().importData();
+    dynamodbService.handler.getInstance().importSqliteData();
   });
 
 commander

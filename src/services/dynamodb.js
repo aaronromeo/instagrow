@@ -5,6 +5,7 @@ const fs = require('fs');
 const humps = require('humps');
 const moment = require('moment');
 const constants = require("../constants");
+const dataMarshalService = require("./dataMarshal");
 
 const USER_INITIAL_RECORD = (instagramOwner, instagramId, username) => ({
   instagramOwner,
@@ -26,7 +27,6 @@ AWS.config.setPromisesDependency(Promise);
 class DynamoDBService {
   constructor(config) {
     this.config = config;
-    this.usersTable = `Instagrow-Users`;
     this.db = new AWS.DynamoDB();
     this.docClient = new AWS.DynamoDB.DocumentClient();
     this.followingInteractionDeltaInDays = config.followingInteractionDeltaInDays || constants.settings.FOLLOWING_INTERACTION_DELTA_IN_DAYS
@@ -36,7 +36,7 @@ class DynamoDBService {
 
   createDB() {
     const CREATE_SCRIPT = {
-      TableName : this.usersTable,
+      TableName : "Instagrow-Users",
       KeySchema: [
         { AttributeName: "instagramOwner", KeyType: "HASH"},
         { AttributeName: "instagramId", KeyType: "RANGE"}
@@ -67,7 +67,7 @@ class DynamoDBService {
 
   updateIndexes() {
     const DELETE_INDEX_LAST_INTERACTION = {
-      TableName : this.usersTable,
+      TableName : "Instagrow-Users",
       GlobalSecondaryIndexUpdates: [
         {
           Delete: {
@@ -78,7 +78,7 @@ class DynamoDBService {
     };
 
     const CREATE_INDEX_LAST_INTERACTION = {
-      TableName : this.usersTable,
+      TableName : "Instagrow-Users",
       AttributeDefinitions: [
         { AttributeName: "instagramOwner", AttributeType: "S"},
         { AttributeName: "lastInteractionAt", AttributeType: "N" }
@@ -113,7 +113,7 @@ class DynamoDBService {
   }
 
   deleteDB() {
-    return this.db.deleteTable({TableName : this.usersTable}).promise()
+    return this.db.deleteTable({TableName : "Instagrow-Users"}).promise()
       .then((data) => {
         console.log("Deleted table. Table description JSON:", JSON.stringify(data, null, 2));
         return new Promise.resolve(data);
@@ -124,12 +124,12 @@ class DynamoDBService {
       });
   }
 
-  importData() {
+  importSqliteData() {
     const allUsers = JSON.parse(fs.readFileSync(`data/dump-${this.config.username}.json`, 'utf8'));
     allUsers.forEach((underscoreUser) => {
       const user = humps.camelizeKeys(underscoreUser);
       const params = {
-        TableName: this.usersTable,
+        TableName: "Instagrow-Users",
         Item: Object.assign({}, user, {
           instagramId: user.instagramId.toString(),
           lastInteractionAt: (user.lastInteractionAt || 0),
@@ -148,9 +148,80 @@ class DynamoDBService {
     });
   }
 
+  createBackup() {
+    const backupName = `Instagrow-Users-Bkup-${moment().valueOf()}`
+    const backupParams = {
+      BackupName: backupName,
+      TableName: 'Instagrow-Users',
+    };
+
+    return this.db.createBackup(backupParams).promise()
+      .then(() => {
+        console.log(backupName);
+        return Promise.resolve(backupName);
+      })
+  }
+
+  importData() {
+    const backupName = `Instagrow-Users-Bkup-${moment().valueOf()}`
+    const backupParams = {
+      BackupName: backupName,
+      TableName: 'Instagrow-Users',
+    };
+
+    const dataMarshal = new dataMarshalService.service.DataMarshal();
+    dataMarshal.importData(`data/dump-dynamodb.json`);
+
+    return Promise.map(dataMarshal.records, (record) => {
+      const putParams = {
+        TableName: "Instagrow-Users",
+        Item: record,
+      };
+
+      this.docClient.put(putParams, (err, data) => {
+        if (err) {
+          console.error(`Unable to add user ${record.username} (${record.instagramId}). Error JSON: ${JSON.stringify(err, null, 2)}`);
+        } else {
+          console.log(`Imported ${record.username} (${record.instagramId})`);
+        }
+      });
+    })
+  }
+
+  exportData() {
+    return this.db.describeTable({ "TableName": "Instagrow-Users" }).promise()
+      .then((tableDescription) => {
+        console.log("Describe table successful. Table description JSON:", JSON.stringify(tableDescription, null, 2));
+        return this.docClient.scan(tableDescription.Table).promise()
+          .then((data) => {
+            const dataMarshal = new dataMarshalService.service.DataMarshal();
+            data.Items.forEach((record) => {
+              dataMarshal.addRecord({
+                lastInteractionAt: record.lastInteractionAt,
+                instagramOwner: record.instagramOwner,
+                instagramId: record.instagramId,
+                latestMediaId: record.latestMediaId,
+                latestMediaUrl: record.latestMediaUrl,
+                latestMediaCreatedAt: record.latestMediaCreatedAt,
+                username: record.username,
+              })
+            })
+            dataMarshal.exportData(`data/dump-${this.config.username}.json`);
+            return new Promise.resolve(data);
+          })
+          .catch((err) => {
+            return new Promise.reject(err);
+          });
+      })
+      .catch((err) => {
+        console.error("Unable to describe table. Error JSON:", JSON.stringify(err, null, 2));
+        return new Promise.reject(err);
+      });
+  }
+
   getMediaWithLastInteraction() {
     const params = {
-      TableName: this.usersTable,
+      TableName: "Instagrow-Users",
       IndexName: "lastInteractionIndex",
       KeyConditionExpression:
         "instagramOwner = :io AND lastInteractionAt > :li",
@@ -173,7 +244,7 @@ class DynamoDBService {
 
   getAccountByInstagramId(instagramId) {
     const params = {
-      TableName: this.usersTable,
+      TableName: "Instagrow-Users",
       Key:{
         instagramId: instagramId.toString(),
         instagramOwner: this.config.username,
@@ -191,7 +262,7 @@ class DynamoDBService {
 
   getAccountsPossiblyRequiringInteraction() {
     const params = {
-      TableName: this.usersTable,
+      TableName: "Instagrow-Users",
       IndexName: "lastInteractionIndex",
       KeyConditionExpression:
         "instagramOwner = :io AND lastInteractionAt < :li",
@@ -215,7 +286,7 @@ class DynamoDBService {
     const interactionAgeThreshold = moment().subtract(this.followingInteractionDeltaInDays, 'd');
 
     const params = {
-      TableName: this.usersTable,
+      TableName: "Instagrow-Users",
       KeyConditionExpression:
         "instagramOwner = :io",
       FilterExpression:
@@ -246,7 +317,7 @@ class DynamoDBService {
       .then((account) => {
         if (account && account) {
           const params = {
-            TableName: this.usersTable,
+            TableName: "Instagrow-Users",
             Key: {instagramOwner: this.config.username, instagramId: instagramId.toString()},
             UpdateExpression: "set username = :u",
             ExpressionAttributeValues:{
@@ -260,7 +331,7 @@ class DynamoDBService {
             });
         } else {
           const params = {
-            TableName: this.usersTable,
+            TableName: "Instagrow-Users",
             Item: USER_INITIAL_RECORD(this.config.username, instagramId, username)
           };
           return this.docClient.put(params).promise()
@@ -273,7 +344,7 @@ class DynamoDBService {
 
   updateLatestMediaDetails(instagramId, latestMediaId, latestMediaUrl, latestMediaCreatedAt) {
     const params = {
-      TableName: this.usersTable,
+      TableName: "Instagrow-Users",
       Key: {instagramOwner: this.config.username, instagramId: instagramId.toString()},
       UpdateExpression: "set latestMediaId = :lmi, latestMediaUrl = :lmu, latestMediaCreatedAt = :lmca",
       ExpressionAttributeValues:{
@@ -289,7 +360,7 @@ class DynamoDBService {
 
   updateLastInteration(instagramId, latestInteraction) {
     const params = {
-      TableName: this.usersTable,
+      TableName: "Instagrow-Users",
       Key: {instagramOwner: this.config.username, instagramId: instagramId.toString()},
       UpdateExpression: "set lastInteractionAt = :li",
       ExpressionAttributeValues:{
