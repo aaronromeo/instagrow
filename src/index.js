@@ -1,3 +1,4 @@
+require('dotenv').config()
 const commander = require('commander');
 const constants = require("./constants");
 

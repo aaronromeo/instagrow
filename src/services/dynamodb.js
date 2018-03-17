@@ -20,12 +20,14 @@ const USER_INITIAL_RECORD = (instagramId, username, isFollowing, isFollower) => 
   isActive: true,
 });
 
+const credentials = new AWS.SharedIniFileCredentials({profile: 'instagrow'});
 AWS.config.update({
   region: "us-east-1",
   endpoint: "http://localhost:8000"
-
 });
 AWS.config.setPromisesDependency(Promise);
+AWS.config.credentials = credentials;
+
 
 class DynamoDBService {
   constructor(config) {
