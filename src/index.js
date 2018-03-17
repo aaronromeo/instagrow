@@ -88,10 +88,17 @@ commander
     const accountsFollowing = require("./getAccountsFollowing");
     const latestActivityOfFollowedAccounts = require("./getLatestActivityOfAccounts");
 
-    constants.settings.DATABASE_OBJECT.handler.createInstance(config);
-    accountsFollowing.getAccountsFollowing(config, constants.settings.DATABASE_OBJECT)
-      .then(() => latestActivityOfFollowedAccounts.getLatestActivityOfAccounts(config, constants.settings.DATABASE_OBJECT))
-      .finally(() => constants.settings.DATABASE_OBJECT.handler.getInstance().close());
+    const updateInteractionActivity = async () => {
+      await accountsFollowing.getAccountsFollowing(config, constants.settings.DATABASE_OBJECT)
+      await latestActivityOfFollowedAccounts.getLatestActivityOfAccounts(config, constants.settings.DATABASE_OBJECT)
+    }
+
+    try {
+      constants.settings.DATABASE_OBJECT.handler.createInstance(config);
+      updateInteractionActivity().catch((err) => {console.log(err)})
+    } finally {
+      constants.settings.DATABASE_OBJECT.handler.getInstance().close();
+    }
   });
 
 commander
@@ -121,13 +128,20 @@ commander
     const latestMediaOfFollowedAccounts = require("./getLatestMediaOfAccounts");
     const pendingLikeMediaToQueue = require("./addPendingLikeMediaToQueue");
 
-    constants.settings.DATABASE_OBJECT.handler.createInstance(config);
-    accountsFollowing.getAccountsFollowing(config, constants.settings.DATABASE_OBJECT)
-      .then(() => accountFollowers.getAccountFollowers(config, constants.settings.DATABASE_OBJECT))
-      .then(() => latestActivityOfFollowedAccounts.getLatestActivityOfAccounts(config, constants.settings.DATABASE_OBJECT))
-      .then(() => latestMediaOfFollowedAccounts.getLatestMediaOfAccounts(config, constants.settings.DATABASE_OBJECT))
-      .then(() => pendingLikeMediaToQueue.addPendingLikeMediaToQueue(config, constants.settings.DATABASE_OBJECT))
-      .finally(() => constants.settings.DATABASE_OBJECT.handler.getInstance().close());
+    const addPendingLikeMediaToQueue = async () => {
+      await accountsFollowing.getAccountsFollowing(config, constants.settings.DATABASE_OBJECT);
+      await accountFollowers.getAccountFollowers(config, constants.settings.DATABASE_OBJECT);
+      await latestActivityOfFollowedAccounts.getLatestActivityOfAccounts(config, constants.settings.DATABASE_OBJECT);
+      await latestMediaOfFollowedAccounts.getLatestMediaOfAccounts(config, constants.settings.DATABASE_OBJECT);
+      await pendingLikeMediaToQueue.addPendingLikeMediaToQueue(config, constants.settings.DATABASE_OBJECT);
+    }
+
+    try {
+      constants.settings.DATABASE_OBJECT.handler.createInstance(config);
+      addPendingLikeMediaToQueue().catch((err) => {console.log(err)})
+    } finally {
+      constants.settings.DATABASE_OBJECT.handler.getInstance().close();
+    }
   });
 
 commander
@@ -141,9 +155,17 @@ commander
     const latestMediaOfFollowedAccounts = require("./getLatestMediaOfAccounts");
     const likedMedia = require("./updateLikedMedia");
 
-    constants.settings.DATABASE_OBJECT.handler.createInstance(config);
-    likedMedia.updateLikedMedia(config, constants.settings.DATABASE_OBJECT)
-      .finally(() => constants.settings.DATABASE_OBJECT.handler.getInstance().close());
+
+    const likeMedia = async () => {
+      await likedMedia.updateLikedMedia(config, constants.settings.DATABASE_OBJECT)
+    }
+
+    try {
+      constants.settings.DATABASE_OBJECT.handler.createInstance(config);
+      likeMedia().catch((err) => {console.log(err)})
+    } finally {
+      constants.settings.DATABASE_OBJECT.handler.getInstance().close();
+    }
   });
 
 commander.parse(process.argv);

@@ -35,7 +35,7 @@ class DynamoDBService {
     this.db = new AWS.DynamoDB();
     this.docClient = new AWS.DynamoDB.DocumentClient();
     this.followingInteractionDeltaInDays = config.followingInteractionDeltaInDays || constants.settings.FOLLOWING_INTERACTION_DELTA_IN_DAYS
-    this.followerInteractionDeltaInDays = config.followerInteractionDeltaInDays || constants.settings.FOLLOWER_INTERACTION_DELTA_IN_DAYS
+    this.followerInteractionDeltaInDays = config.hasOwnProperty("followerInteractionDeltaInDays") ? config.followerInteractionDeltaInDays : constants.settings.FOLLOWER_INTERACTION_DELTA_IN_DAYS
     this.userTableName = `Instagrow-${this.config.username}-Users`;
     this.pendingMediaTableName = `Instagrow-${this.config.username}-Media-Pending-Likes`;
   };
@@ -102,29 +102,6 @@ class DynamoDBService {
       });
   }
 
-/*  importSqliteData() {
-    const allUsers = JSON.parse(fs.readFileSync(`data/dump-${this.config.username}.json`, 'utf8'));
-    allUsers.forEach((underscoreUser) => {
-      const user = humps.camelizeKeys(underscoreUser);
-      const params = {
-        TableName: this.userTableName,
-        Item: Object.assign({}, user, {
-          instagramId: user.instagramId.toString(),
-          lastInteractionAt: (user.lastInteractionAt || 0),
-          latestMediaCreatedAt: (user.latestMediaCreatedAt || 0),
-        }),
-      };
-
-      this.docClient.put(params, (err, data) => {
-        if (err) {
-          console.error(`Unable to add user ${user.username} (${user.instagramId}). Error JSON: ${JSON.stringify(err, null, 2)}`);
-        } else {
-          console.log(`Imported ${user.username} (${user.instagramId})`);
-        }
-      });
-    });
-  }
-*/
   createBackup() {
     const backupName = `${this.userTableName}-Bkup-${moment().valueOf()}`
     const backupParams = {
@@ -195,9 +172,7 @@ class DynamoDBService {
         "lastInteractionAt > :li",
       ExpressionAttributeValues: {
         ":li": 0,
-      },
-      Limit: 1,
-      ScanIndexForward: false,
+      }
     };
 
     return this.docClient.scan(params).promise()
@@ -232,18 +207,21 @@ class DynamoDBService {
   };
 
   getAccountsPossiblyRequiringInteraction() {
-    const followingClause = "lastInteractionAt < :lifollowing AND isActive=:ia AND isFollowing=:if";
-    const followerClause = "lastInteractionAt < :lifollower AND isActive=:ia AND isFollower=:if";
+    const followerInteractionAgeThreshold = this.followerInteractionDeltaInDays && moment().subtract(this.followerInteractionDeltaInDays, 'd');
+    const followingClause = "lastInteractionAt < :lifollowing AND isActive=:true AND isFollowing=:true";
+    const followerClause = followerInteractionAgeThreshold ? "lastInteractionAt < :lifollower AND isActive=:true AND isFollower=:true" : "";
+    const filterExpression = followerClause ? `(${followingClause}) OR (${followerClause})` : followingClause;
+    const expressionAttributeValues = {
+      ":lifollowing": moment().subtract(this.followingInteractionDeltaInDays, 'd').valueOf(),
+      ":true": true,
+    }
+    if (followerInteractionAgeThreshold) {
+      expressionAttributeValues[":lifollower"] = followerInteractionAgeThreshold.valueOf();
+    }
     const params = {
       TableName: this.userTableName,
-      FilterExpression:
-        `(${followingClause}) OR (${followerClause})`,
-      ExpressionAttributeValues: {
-        ":lifollowing": moment().subtract(this.followingInteractionDeltaInDays, 'd').valueOf(),
-        ":lifollower": moment().subtract(this.followingInteractionDeltaInDays, 'd').valueOf(),
-        ":if": true,
-        ":ia": true,
-      },
+      FilterExpression: filterExpression,
+      ExpressionAttributeValues: expressionAttributeValues,
     };
 
     return this.docClient.scan(params).promise()
@@ -258,21 +236,23 @@ class DynamoDBService {
   getAccountsToBeLiked() {
     const maximumAgeOfContentConsidered = moment().subtract(1, 'w');
     const followingInteractionAgeThreshold = moment().subtract(this.followingInteractionDeltaInDays, 'd');
-    const followerInteractionAgeThreshold = moment().subtract(this.followerInteractionDeltaInDays, 'd');
-    const followingClause = "latestMediaCreatedAt > :lmca AND lastInteractionAt < latestMediaCreatedAt AND lastInteractionAt < :lifollowing AND isActive=:ia AND isFollowing=:if";
-    const followerClause = followerInteractionAgeThreshold ? "latestMediaCreatedAt > :lmca AND lastInteractionAt < latestMediaCreatedAt AND lastInteractionAt < :lifollower AND isActive=:ia AND isFollower=:if" : "";
+    const followerInteractionAgeThreshold = this.followerInteractionDeltaInDays && moment().subtract(this.followerInteractionDeltaInDays, 'd');
+    const followingClause = "latestMediaCreatedAt > :lmca AND lastInteractionAt < latestMediaCreatedAt AND lastInteractionAt < :lifollowing AND isActive=:true AND isFollowing=:true";
+    const followerClause = followerInteractionAgeThreshold ? "latestMediaCreatedAt > :lmca AND lastInteractionAt < latestMediaCreatedAt AND lastInteractionAt < :lifollower AND isActive=:true AND isFollower=:true" : "";
+    const filterExpression = followerClause ? `(${followingClause}) OR (${followerClause})` : followingClause;
+    const expressionAttributeValues = {
+      ":lmca": maximumAgeOfContentConsidered.valueOf(),
+      ":lifollowing": followingInteractionAgeThreshold.valueOf(),
+      ":true": true,
+    }
+    if (followerInteractionAgeThreshold) {
+      expressionAttributeValues[":lifollower"] = followerInteractionAgeThreshold.valueOf();
+    }
 
     const params = {
       TableName: this.userTableName,
-      FilterExpression:
-        `(${followingClause}) OR (${followerClause})`,
-      ExpressionAttributeValues: {
-        ":lmca": maximumAgeOfContentConsidered.valueOf(),
-        ":lifollowing": followingInteractionAgeThreshold.valueOf(),
-        ":lifollower": followerInteractionAgeThreshold.valueOf(),
-        ":ia": true,
-        ":if": true,
-      },
+      FilterExpression: filterExpression,
+      ExpressionAttributeValues: expressionAttributeValues,
     };
 
     return this.docClient.scan(params).promise()
@@ -287,19 +267,18 @@ class DynamoDBService {
   updateFollowerAccountsToInactive() {
     const scanParams = {
       TableName: this.userTableName,
-      FilterExpression: "isFollower=:if",
+      FilterExpression: "isFollower=:true",
       ExpressionAttributeValues: {
-        ":if": true,
+        ":true": true,
       }
     };
 
     const updateParams = (instagramId) => ({
       TableName: this.userTableName,
       Key: {instagramId: instagramId},
-      UpdateExpression: "set isActive = :ia, isFollower = :if",
+      UpdateExpression: "set isActive = :false, isFollower = :false",
       ExpressionAttributeValues:{
-        ":ia": false,
-        ":if": false,
+        ":false": false,
       },
       ReturnValues:"UPDATED_NEW",
     });
@@ -313,19 +292,18 @@ class DynamoDBService {
   updateFollowingAccountsToInactive() {
     const scanParams = {
       TableName: this.userTableName,
-      FilterExpression: "isFollowing=:if",
+      FilterExpression: "isFollowing=:true",
       ExpressionAttributeValues: {
-        ":if": true,
+        ":true": true,
       }
     };
 
     const updateParams = (instagramId) => ({
       TableName: this.userTableName,
       Key: {instagramId: instagramId},
-      UpdateExpression: "set isActive = :ia, isFollowing = :if",
+      UpdateExpression: "set isActive = :false, isFollowing = :false",
       ExpressionAttributeValues:{
-        ":ia": false,
-        ":if": false,
+        ":false": false,
       },
       ReturnValues:"UPDATED_NEW",
     });
@@ -343,11 +321,10 @@ class DynamoDBService {
           const params = {
             TableName: this.userTableName,
             Key: {instagramId: instagramId.toString()},
-            UpdateExpression: "set username = :u, isFollower = :if, isActive = :ia",
+            UpdateExpression: "set username = :u, isFollower = :true, isActive = :true",
             ExpressionAttributeValues:{
               ":u": username,
-              ":if": true,
-              ":ia": true,
+              ":true": true,
             },
             ReturnValues:"UPDATED_NEW"
           };
@@ -358,7 +335,7 @@ class DynamoDBService {
         } else {
           const params = {
             TableName: this.userTableName,
-            Item: USER_INITIAL_RECORD(this.config.username, instagramId, username, false, true)
+            Item: USER_INITIAL_RECORD(instagramId, username, false, true)
           };
           return this.docClient.put(params).promise()
             .then(() => {
@@ -375,11 +352,10 @@ class DynamoDBService {
           const params = {
             TableName: this.userTableName,
             Key: {instagramId: instagramId.toString()},
-            UpdateExpression: "set username = :u, isFollowing = :if, isActive = :ia",
+            UpdateExpression: "set username = :u, isFollowing = :true, isActive = :true",
             ExpressionAttributeValues:{
               ":u": username,
-              ":if": true,
-              ":ia": true,
+              ":true": true,
             },
             ReturnValues:"UPDATED_NEW"
           };
@@ -390,7 +366,7 @@ class DynamoDBService {
         } else {
           const params = {
             TableName: this.userTableName,
-            Item: USER_INITIAL_RECORD(this.config.username, instagramId, username, true, false)
+            Item: USER_INITIAL_RECORD(instagramId, username, true, false)
           };
           return this.docClient.put(params).promise()
             .then(() => {
