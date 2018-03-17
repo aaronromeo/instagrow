@@ -4,19 +4,19 @@ const Promise = require('bluebird');
 
 const sessionSingleton = require("./services/sessionSingleton");
 
-exports.getLatestMediaOfFollowedAccounts = (config, db) => sessionSingleton.session.createSession(config)
+exports.getLatestMediaOfAccounts = (config, db) => sessionSingleton.session.createSession(config)
   .then((session) => {
-    const accountsFollowing = db.handler.getInstance().getAccountsPossiblyRequiringInteraction();
-    return [session, accountsFollowing]
+    const accountsRelated = db.handler.getInstance().getAccountsPossiblyRequiringInteraction();
+    return [session, accountsRelated]
   })
-  .spread((session, accountsFollowing) => {
-    const accountsFollowingUserMedia = accountsFollowing.map(accountFollowing => {
+  .spread((session, accountsRelated) => {
+    const accountsRelatedUserMedia = accountsRelated.map(accountFollowing => {
       return new Client.Feed.UserMedia(session, accountFollowing.instagramId, 1);
     })
-    return [session, accountsFollowingUserMedia];
+    return [session, accountsRelatedUserMedia];
   })
-  .spread((session, accountsFollowingUserMedia) => {
-    return Promise.map(accountsFollowingUserMedia, latestUserMedia => {
+  .spread((session, accountsRelatedUserMedia) => {
+    return Promise.map(accountsRelatedUserMedia, latestUserMedia => {
       return latestUserMedia.get()
         .catch(e => {console.log(`${e.message} trying to retrieve ${latestUserMedia.accountId}`)});
     });

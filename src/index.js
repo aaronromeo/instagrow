@@ -85,11 +85,11 @@ commander
   .action((username) => {
     const config = require(`../config.${username}.json`);
     const accountsFollowing = require("./getAccountsFollowing");
-    const latestActivityOfFollowedAccounts = require("./getLatestActivityOfFollowedAccounts");
+    const latestActivityOfFollowedAccounts = require("./getLatestActivityOfAccounts");
 
     constants.settings.DATABASE_OBJECT.handler.createInstance(config);
     accountsFollowing.getAccountsFollowing(config, constants.settings.DATABASE_OBJECT)
-      .then(() => latestActivityOfFollowedAccounts.getLatestActivityOfFollowedAccounts(config, constants.settings.DATABASE_OBJECT))
+      .then(() => latestActivityOfFollowedAccounts.getLatestActivityOfAccounts(config, constants.settings.DATABASE_OBJECT))
       .finally(() => constants.settings.DATABASE_OBJECT.handler.getInstance().close());
   });
 
@@ -100,30 +100,32 @@ commander
   .action((username) => {
     const config = require(`../config.${username}.json`);
     const accountsFollowing = require("./getAccountsFollowing");
-    const latestMediaOfFollowedAccounts = require("./getLatestMediaOfFollowedAccounts");
+    const latestMediaOfFollowedAccounts = require("./getLatestMediaOfAccounts");
 
     constants.settings.DATABASE_OBJECT.handler.createInstance(config);
     accountsFollowing.getAccountsFollowing(config, constants.settings.DATABASE_OBJECT)
-      .then(() => latestMediaOfFollowedAccounts.getLatestMediaOfFollowedAccounts(config, constants.settings.DATABASE_OBJECT))
+      .then(() => latestMediaOfFollowedAccounts.getLatestMediaOfAccounts(config, constants.settings.DATABASE_OBJECT))
       .finally(() => constants.settings.DATABASE_OBJECT.handler.getInstance().close());
   });
 
 commander
-  .command('addFollowingPendingLikeMediaToQueue <username>')
+  .command('addPendingLikeMediaToQueue <username>')
   .alias('a')
   .description('Queue media requiring "like" interactions for followed accounts who have posted content in the last 3-7 days')
   .action((username) => {
     const config = require(`../config.${username}.json`);
     const accountsFollowing = require("./getAccountsFollowing");
-    const latestActivityOfFollowedAccounts = require("./getLatestActivityOfFollowedAccounts");
-    const latestMediaOfFollowedAccounts = require("./getLatestMediaOfFollowedAccounts");
-    const followingPendingLikeMediaToQueue = require("./addFollowingPendingLikeMediaToQueue");
+    const accountFollowers = require("./getAccountFollowers");
+    const latestActivityOfFollowedAccounts = require("./getLatestActivityOfAccounts");
+    const latestMediaOfFollowedAccounts = require("./getLatestMediaOfAccounts");
+    const pendingLikeMediaToQueue = require("./addPendingLikeMediaToQueue");
 
     constants.settings.DATABASE_OBJECT.handler.createInstance(config);
     accountsFollowing.getAccountsFollowing(config, constants.settings.DATABASE_OBJECT)
-      .then(() => latestActivityOfFollowedAccounts.getLatestActivityOfFollowedAccounts(config, constants.settings.DATABASE_OBJECT))
-      .then(() => latestMediaOfFollowedAccounts.getLatestMediaOfFollowedAccounts(config, constants.settings.DATABASE_OBJECT))
-      .then(() => followingPendingLikeMediaToQueue.addFollowingPendingLikeMediaToQueue(config, constants.settings.DATABASE_OBJECT))
+      .then(() => accountFollowers.getAccountFollowers(config, constants.settings.DATABASE_OBJECT))
+      .then(() => latestActivityOfFollowedAccounts.getLatestActivityOfAccounts(config, constants.settings.DATABASE_OBJECT))
+      .then(() => latestMediaOfFollowedAccounts.getLatestMediaOfAccounts(config, constants.settings.DATABASE_OBJECT))
+      .then(() => pendingLikeMediaToQueue.addPendingLikeMediaToQueue(config, constants.settings.DATABASE_OBJECT))
       .finally(() => constants.settings.DATABASE_OBJECT.handler.getInstance().close());
   });
 
@@ -134,8 +136,8 @@ commander
   .action((username) => {
     const config = require(`../config.${username}.json`);
     const accountsFollowing = require("./getAccountsFollowing");
-    const latestActivityOfFollowedAccounts = require("./getLatestActivityOfFollowedAccounts");
-    const latestMediaOfFollowedAccounts = require("./getLatestMediaOfFollowedAccounts");
+    const latestActivityOfFollowedAccounts = require("./getLatestActivityOfAccounts");
+    const latestMediaOfFollowedAccounts = require("./getLatestMediaOfAccounts");
     const likedMedia = require("./updateLikedMedia");
 
     constants.settings.DATABASE_OBJECT.handler.createInstance(config);

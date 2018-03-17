@@ -2,18 +2,22 @@ const Promise = require('bluebird');
 const AWS = require("aws-sdk");
 const DynamoDB = Promise.promisifyAll(require("aws-sdk").DynamoDB);
 const fs = require('fs');
+const _ = require('lodash');
 const humps = require('humps');
 const moment = require('moment');
 const constants = require("../constants");
 const dataMarshalService = require("./dataMarshal");
 
-const USER_INITIAL_RECORD = (instagramId, username) => ({
+const USER_INITIAL_RECORD = (instagramId, username, isFollowing, isFollower) => ({
   instagramId: instagramId.toString(),
   username,
   lastInteractionAt: 0,
   latestMediaCreatedAt: 0,
   latestMediaId: null,
   latestMediaUrl: null,
+  isFollowing,
+  isFollower,
+  isActive: true,
 });
 
 AWS.config.update({
@@ -29,10 +33,9 @@ class DynamoDBService {
     this.db = new AWS.DynamoDB();
     this.docClient = new AWS.DynamoDB.DocumentClient();
     this.followingInteractionDeltaInDays = config.followingInteractionDeltaInDays || constants.settings.FOLLOWING_INTERACTION_DELTA_IN_DAYS
+    this.followerInteractionDeltaInDays = config.followerInteractionDeltaInDays || constants.settings.FOLLOWER_INTERACTION_DELTA_IN_DAYS
     this.userTableName = `Instagrow-${this.config.username}-Users`;
     this.pendingMediaTableName = `Instagrow-${this.config.username}-Media-Pending-Likes`;
-
-    this.addAccountOrUpdateUsername.bind(this);
   };
 
   createDB() {
@@ -97,7 +100,7 @@ class DynamoDBService {
       });
   }
 
-  importSqliteData() {
+/*  importSqliteData() {
     const allUsers = JSON.parse(fs.readFileSync(`data/dump-${this.config.username}.json`, 'utf8'));
     allUsers.forEach((underscoreUser) => {
       const user = humps.camelizeKeys(underscoreUser);
@@ -119,7 +122,7 @@ class DynamoDBService {
       });
     });
   }
-
+*/
   createBackup() {
     const backupName = `${this.userTableName}-Bkup-${moment().valueOf()}`
     const backupParams = {
@@ -168,14 +171,7 @@ class DynamoDBService {
           .then((data) => {
             const dataMarshal = new dataMarshalService.service.DataMarshal();
             data.Items.forEach((record) => {
-              dataMarshal.addRecord({
-                lastInteractionAt: record.lastInteractionAt,
-                instagramId: record.instagramId,
-                latestMediaId: record.latestMediaId,
-                latestMediaUrl: record.latestMediaUrl,
-                latestMediaCreatedAt: record.latestMediaCreatedAt,
-                username: record.username,
-              })
+              dataMarshal.addRecord(record)
             })
             dataMarshal.exportData(`data/dump-${this.config.username}-dynamodb.json`);
             return new Promise.resolve(data);
@@ -204,7 +200,12 @@ class DynamoDBService {
 
     return this.docClient.scan(params).promise()
       .then((data) => {
-        return new Promise.resolve(data.Items && data.Items[0]);
+        const reducer = (accumulator, item) =>
+          item.lastInteractionAt > accumulator.lastInteractionAt ? item : accumulator;
+
+        return new Promise.resolve(
+          data.Items && data.Items.reduce(reducer, {lastInteractionAt: 0})
+        );
       })
       .catch((err) => {
         return new Promise.reject(err);
@@ -229,12 +230,17 @@ class DynamoDBService {
   };
 
   getAccountsPossiblyRequiringInteraction() {
+    const followingClause = "lastInteractionAt < :lifollowing AND isActive=:ia AND isFollowing=:if";
+    const followerClause = "lastInteractionAt < :lifollower AND isActive=:ia AND isFollower=:if";
     const params = {
       TableName: this.userTableName,
       FilterExpression:
-        "lastInteractionAt < :li",
+        `(${followingClause}) OR (${followerClause})`,
       ExpressionAttributeValues: {
-        ":li": moment().subtract(this.followingInteractionDeltaInDays, 'd').valueOf(),
+        ":lifollowing": moment().subtract(this.followingInteractionDeltaInDays, 'd').valueOf(),
+        ":lifollower": moment().subtract(this.followingInteractionDeltaInDays, 'd').valueOf(),
+        ":if": true,
+        ":ia": true,
       },
     };
 
@@ -249,25 +255,26 @@ class DynamoDBService {
 
   getAccountsToBeLiked() {
     const maximumAgeOfContentConsidered = moment().subtract(1, 'w');
-    const interactionAgeThreshold = moment().subtract(this.followingInteractionDeltaInDays, 'd');
+    const followingInteractionAgeThreshold = moment().subtract(this.followingInteractionDeltaInDays, 'd');
+    const followerInteractionAgeThreshold = moment().subtract(this.followerInteractionDeltaInDays, 'd');
+    const followingClause = "latestMediaCreatedAt > :lmca AND lastInteractionAt < latestMediaCreatedAt AND lastInteractionAt < :lifollowing AND isActive=:ia AND isFollowing=:if";
+    const followerClause = followerInteractionAgeThreshold ? "latestMediaCreatedAt > :lmca AND lastInteractionAt < latestMediaCreatedAt AND lastInteractionAt < :lifollower AND isActive=:ia AND isFollower=:if" : "";
 
     const params = {
       TableName: this.userTableName,
       FilterExpression:
-        "latestMediaCreatedAt > :lmca AND lastInteractionAt < latestMediaCreatedAt AND lastInteractionAt < :li",
+        `(${followingClause}) OR (${followerClause})`,
       ExpressionAttributeValues: {
         ":lmca": maximumAgeOfContentConsidered.valueOf(),
-        ":li": interactionAgeThreshold.valueOf(),
+        ":lifollowing": followingInteractionAgeThreshold.valueOf(),
+        ":lifollower": followerInteractionAgeThreshold.valueOf(),
+        ":ia": true,
+        ":if": true,
       },
     };
 
     return this.docClient.scan(params).promise()
       .then((data) => {
-        const item = data.Items.find(item => item.latestMediaCreatedAt < maximumAgeOfContentConsidered.valueOf() ||
-          item.lastInteractionAt > item.latestMediaCreatedAt ||
-          item.lastInteractionAt > interactionAgeThreshold.valueOf()
-        );
-        if (item) { throw JSON.stringify(item) };
         return new Promise.resolve(data.Items);
       })
       .catch((err) => {
@@ -275,16 +282,70 @@ class DynamoDBService {
       });
    };
 
-  addAccountOrUpdateUsername(instagramId, username) {
+  updateFollowerAccountsToInactive() {
+    const scanParams = {
+      TableName: this.userTableName,
+      FilterExpression: "isFollower=:if",
+      ExpressionAttributeValues: {
+        ":if": true,
+      }
+    };
+
+    const updateParams = (instagramId) => ({
+      TableName: this.userTableName,
+      Key: {instagramId: instagramId},
+      UpdateExpression: "set isActive = :ia, isFollower = :if",
+      ExpressionAttributeValues:{
+        ":ia": false,
+        ":if": false,
+      },
+      ReturnValues:"UPDATED_NEW",
+    });
+
+    return this.docClient.scan(scanParams).promise()
+      .then((data) => Promise.map(data.Items, (account) => this.docClient.update(
+        updateParams(account.instagramId.toString()))
+      ));
+  }
+
+  updateFollowingAccountsToInactive() {
+    const scanParams = {
+      TableName: this.userTableName,
+      FilterExpression: "isFollowing=:if",
+      ExpressionAttributeValues: {
+        ":if": true,
+      }
+    };
+
+    const updateParams = (instagramId) => ({
+      TableName: this.userTableName,
+      Key: {instagramId: instagramId},
+      UpdateExpression: "set isActive = :ia, isFollowing = :if",
+      ExpressionAttributeValues:{
+        ":ia": false,
+        ":if": false,
+      },
+      ReturnValues:"UPDATED_NEW",
+    });
+
+    return this.docClient.scan(scanParams).promise()
+      .then((data) => Promise.map(data.Items, (account) => this.docClient.update(
+        updateParams(account.instagramId.toString()))
+      ));
+  }
+
+  addFollowersAccountOrUpdateUsername(instagramId, username) {
     return this.getAccountByInstagramId(instagramId)
       .then((account) => {
         if (account) {
           const params = {
             TableName: this.userTableName,
             Key: {instagramId: instagramId.toString()},
-            UpdateExpression: "set username = :u",
+            UpdateExpression: "set username = :u, isFollower = :if, isActive = :ia",
             ExpressionAttributeValues:{
-              ":u": username
+              ":u": username,
+              ":if": true,
+              ":ia": true,
             },
             ReturnValues:"UPDATED_NEW"
           };
@@ -295,7 +356,39 @@ class DynamoDBService {
         } else {
           const params = {
             TableName: this.userTableName,
-            Item: USER_INITIAL_RECORD(this.config.username, instagramId, username)
+            Item: USER_INITIAL_RECORD(this.config.username, instagramId, username, false, true)
+          };
+          return this.docClient.put(params).promise()
+            .then(() => {
+              return new Promise.resolve({instagramId: instagramId, username: username})
+            });
+        }
+      })
+  }
+
+  addFollowingAccountOrUpdateUsername(instagramId, username) {
+    return this.getAccountByInstagramId(instagramId)
+      .then((account) => {
+        if (account) {
+          const params = {
+            TableName: this.userTableName,
+            Key: {instagramId: instagramId.toString()},
+            UpdateExpression: "set username = :u, isFollowing = :if, isActive = :ia",
+            ExpressionAttributeValues:{
+              ":u": username,
+              ":if": true,
+              ":ia": true,
+            },
+            ReturnValues:"UPDATED_NEW"
+          };
+          return this.docClient.update(params).promise()
+            .then(() => {
+              return new Promise.resolve({instagramId: instagramId, username: username})
+            });
+        } else {
+          const params = {
+            TableName: this.userTableName,
+            Item: USER_INITIAL_RECORD(this.config.username, instagramId, username, true, false)
           };
           return this.docClient.put(params).promise()
             .then(() => {

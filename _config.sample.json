@@ -1,5 +1,6 @@
 {
   "username": "",
   "password": "",
-  "followingInteractionDeltaInDays": 3
+  "followingInteractionDeltaInDays": 3,
+  "followerInteractionDeltaInDays": 14
 }
