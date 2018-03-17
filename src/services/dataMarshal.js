@@ -6,7 +6,7 @@ class DataMarshal {
     this._records = [];
   };
 
-  addRecord({instagramId, lastInteractionAt, latestMediaId, latestMediaUrl, latestMediaCreatedAt, username} = {}) {
+  addRecord({instagramId, lastInteractionAt, latestMediaId, latestMediaUrl, latestMediaCreatedAt, username, isFollowing, isFollower, isActive} = {}) {
     this._records.push({
       lastInteractionAt: lastInteractionAt || 0,
       instagramId: instagramId.toString(),
@@ -14,6 +14,9 @@ class DataMarshal {
       latestMediaUrl,
       latestMediaCreatedAt: latestMediaCreatedAt || 0,
       username,
+      isFollowing,
+      isFollower,
+      isActive,
     })
   }
 
@@ -33,6 +36,9 @@ class DataMarshal {
         latestMediaUrl,
         latestMediaCreatedAt,
         username,
+        isFollowing,
+        isFollower,
+        isActive,
       } = record;
 
       this.addRecord({
@@ -42,6 +48,9 @@ class DataMarshal {
         latestMediaUrl,
         latestMediaCreatedAt,
         username,
+        isFollowing,
+        isFollower,
+        isActive,
       });
     });
   }

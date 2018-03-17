@@ -26,13 +26,13 @@ const getSelfLikedUptoLastInteraction = (session, lastInteraction) => {
   return getNextSelfLikedInteraction(selfLiked, lastInteraction, interactions);
 }
 
-exports.getLatestActivityOfFollowedAccounts = (config, db) => sessionSingleton.session.createSession(config)
+exports.getLatestActivityOfAccounts = (config, db) => sessionSingleton.session.createSession(config)
   .then((session) => {
     const lastInteraction = db.handler.getInstance().getMediaWithLastInteraction();
     return [session, lastInteraction];
   })
   .spread((session, lastInteraction) => {
-    if (!lastInteraction) { throw "No interactions logged"; }
+    if (!lastInteraction || !lastInteraction.username) { throw "No interactions logged"; } // TODO: Build out a statergy for new accounts
     console.log(`Last interaction is for ${lastInteraction.username} on ${lastInteraction.latestMediaUrl} ${lastInteraction.latestMediaId}`);
     return [getSelfLikedUptoLastInteraction(session, lastInteraction), lastInteraction];
   })

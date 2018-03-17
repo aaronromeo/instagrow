@@ -5,21 +5,21 @@ const moment = require('moment');
 
 const sessionSingleton = require("./services/sessionSingleton");
 
-exports.addFollowingPendingLikeMediaToQueue = (config, db) => sessionSingleton.session.createSession(config)
+exports.addPendingLikeMediaToQueue = (config, db) => sessionSingleton.session.createSession(config)
   .then((session) => {
-    const accountsToBeLiked = db.handler.getInstance().getAccountsToBeLiked();
-    return [session, accountsToBeLiked]
+    const accountsRelated = db.handler.getInstance().getAccountsToBeLiked();
+    return [session, accountsRelated]
   })
-  .spread((session, accountsToBeLiked) => {
-    if (accountsToBeLiked.length) {
+  .spread((session, accountsRelated) => {
+    if (accountsRelated.length) {
       console.log();
       console.log("Bot will add the following accounts to the queue");
-      accountsToBeLiked.forEach(account =>
+      accountsRelated.forEach(account =>
         console.log(`${account.username}\t(${account.instagramId})\t${account.latestMediaUrl}`)
       );
     }
     console.log();
-    return Promise.mapSeries(_.shuffle(accountsToBeLiked), accountToBeInteractedWith => {
+    return Promise.mapSeries(_.shuffle(accountsRelated), accountToBeInteractedWith => {
       return db.handler.getInstance().addLatestMediaToPendingTable(
         accountToBeInteractedWith.instagramId,
         accountToBeInteractedWith.latestMediaId,

@@ -29,8 +29,6 @@ exports.updateLikedMedia = (config, db) => sessionSingleton.session.createSessio
     return [session, mediaToBeLiked]
   })
   .spread((session, mediaToBeLiked) => {
-    console.log(mediaToBeLiked);
-
     if (mediaToBeLiked.length) {
       console.log("Bot will like the following accounts");
       mediaToBeLiked.forEach(media =>

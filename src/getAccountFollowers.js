@@ -3,13 +3,13 @@ const Promise = require('bluebird');
 
 const sessionSingleton = require("./services/sessionSingleton");
 
-exports.getAccountsFollowing = (config, db) => db.handler.getInstance().updateFollowingAccountsToInactive()
+exports.getAccountFollowers = (config, db) => db.handler.getInstance().updateFollowerAccountsToInactive()
   .then(() => sessionSingleton.session.createSession(config))
   .then((session) => {
     return [session, session.getAccountId()];
   })
   .spread((session, accountId) => {
-    return new Client.Feed.AccountFollowing(session, accountId);
+    return new Client.Feed.AccountFollowers(session, accountId);
   })
   .then((feed) => {
     return feed.get();
@@ -17,13 +17,13 @@ exports.getAccountsFollowing = (config, db) => db.handler.getInstance().updateFo
   .then((followingResults) => {
     return Promise.map(
       followingResults,
-      user => db.handler.getInstance().addFollowingAccountOrUpdateUsername(user.id, user._params.username)
+      user => db.handler.getInstance().addFollowersAccountOrUpdateUsername(user.id, user._params.username)
     );
   })
   .then((accountRows) => {
     const badAccounts = accountRows.filter(account => !account);
     if (!badAccounts.length) {
-      console.log(`List of Accounts following successfully saved for ${accountRows.length} accounts`);
+      console.log(`List of Accounts followers successfully saved for ${accountRows.length} accounts`);
       return Promise.resolve();
     } else {
       console.log(`Error saving accounts ${badAccounts}`);
