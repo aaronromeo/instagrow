@@ -19,18 +19,6 @@ commander
   });
 
 commander
-  .command('exportFromSqliteDatabase <username>')
-  .alias('es')
-  .description('Export the Sqlite Instagram database to a file in data/')
-  .action((username) => {
-    const config = require(`../config.${username}.json`);
-    const sqliteService = require("./services/sqlite");
-
-    sqliteService.handler.createInstance(config);
-    sqliteService.handler.getInstance().dumpAllDataToCSV();
-  });
-
-commander
   .command('exportFromDynamoDB <username>')
   .alias('ed')
   .description('Export the DynamoDB Instagram database to a file in data/')
@@ -93,12 +81,10 @@ commander
       await latestActivityOfFollowedAccounts.getLatestActivityOfAccounts(config, constants.settings.DATABASE_OBJECT)
     }
 
-    try {
-      constants.settings.DATABASE_OBJECT.handler.createInstance(config);
-      updateInteractionActivity().catch((err) => {console.log(err)})
-    } finally {
-      constants.settings.DATABASE_OBJECT.handler.getInstance().close();
-    }
+    constants.settings.DATABASE_OBJECT.handler.createInstance(config);
+    updateInteractionActivity()
+      .catch((err) => {console.log(err)})
+      .finally(() => constants.settings.DATABASE_OBJECT.handler.getInstance().close());
   });
 
 commander
@@ -136,12 +122,10 @@ commander
       await pendingLikeMediaToQueue.addPendingLikeMediaToQueue(config, constants.settings.DATABASE_OBJECT);
     }
 
-    try {
-      constants.settings.DATABASE_OBJECT.handler.createInstance(config);
-      addPendingLikeMediaToQueue().catch((err) => {console.log(err)})
-    } finally {
-      constants.settings.DATABASE_OBJECT.handler.getInstance().close();
-    }
+    constants.settings.DATABASE_OBJECT.handler.createInstance(config);
+    addPendingLikeMediaToQueue()
+      .catch((err) => {console.log(err)})
+      .finally(() => constants.settings.DATABASE_OBJECT.handler.getInstance().close());
   });
 
 commander
@@ -160,12 +144,10 @@ commander
       await likedMedia.updateLikedMedia(config, constants.settings.DATABASE_OBJECT)
     }
 
-    try {
-      constants.settings.DATABASE_OBJECT.handler.createInstance(config);
-      likeMedia().catch((err) => {console.log(err)})
-    } finally {
-      constants.settings.DATABASE_OBJECT.handler.getInstance().close();
-    }
+    constants.settings.DATABASE_OBJECT.handler.createInstance(config);
+    likeMedia()
+      .catch((err) => {console.log(err)})
+      .finally(() => constants.settings.DATABASE_OBJECT.handler.getInstance().close());
   });
 
 commander.parse(process.argv);

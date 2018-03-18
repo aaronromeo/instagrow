@@ -126,13 +126,13 @@ class DynamoDBService {
     const dataMarshal = new dataMarshalService.service.DataMarshal();
     dataMarshal.importData(`data/dump-${this.config.username}-dynamodb.json`);
 
-    return Promise.map(dataMarshal.records, (record) => {
+    return Promise.map(dataMarshal.records, async (record) => {
       const putParams = {
         TableName: this.userTableName,
         Item: record,
       };
 
-      this.docClient.put(putParams, (err, data) => {
+      await this.docClient.put(putParams, (err, data) => {
         if (err) {
           console.error(`Unable to add user ${record.username} (${record.instagramId}). Error JSON: ${JSON.stringify(err, null, 2)}`);
         } else {
