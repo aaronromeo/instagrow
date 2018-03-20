@@ -1,5 +1,5 @@
 const dynamodbService = require("./services/dynamodb");
-const sqliteService = require("./services/sqlite");
+// const sqliteService = require("./services/sqlite");
 
 const FOLLOWING_INTERACTION_DELTA_IN_DAYS = 3;
 const FOLLOWER_INTERACTION_DELTA_IN_DAYS = 14;
