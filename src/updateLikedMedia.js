@@ -7,15 +7,16 @@ const sessionSingleton = require("./services/sessionSingleton");
 
 const MIN_DELAY = 2000;
 const MAX_DELAY = 10000;
-const MAX_RUNTIME = 200000
+const MAX_RUNTIME = 100000;
 
-const likeMedia = (session, account, db) => {
-  console.log(`Liking ${account.username}\t(${account.instagramId})\t${account.mediaUrl} at ${moment()}`)
-  return [
+const likeMedia = async (session, account, db) => {
+  console.log(`Liking ${account.username}\t(${account.instagramId})\t${account.mediaUrl} at ${moment()}`);
+  await Promise.all([
     new Client.Like.create(session, account.mediaId),
     db.handler.getInstance().updateLastInteration(account.instagramId, moment().valueOf()),
     db.handler.getInstance().deleteMediaFromPendingTable(account.instagramId, account.mediaId),
-  ];
+  ]);
+  return `Liking ${account.username}\t(${account.instagramId})\t${account.mediaUrl} at ${moment()}`;
 }
 
 const getRandomInt = (min, max) => {
@@ -29,25 +30,36 @@ exports.updateLikedMedia = async (config, db) => {
     sessionSingleton.session.createSession(config),
     db.handler.getInstance().getLatestMediaFromPendingTable(),
   ]);
+  const log = [];
+
   if (!mediaToBeLiked.length) {
     console.log("No interactions required");
-    return Promise.resolve()
+    log.push("No interactions required");
+    return Promise.resolve(log)
   }
 
   console.log("Bot will like the following accounts");
-  mediaToBeLiked.forEach(media =>
-    console.log(`${media.username}\t(${media.instagramId})\t${media.mediaUrl}`)
-  );
+  log.push("Bot will like the following accounts");
+  mediaToBeLiked.forEach(media => {
+    console.log(`${media.username}\t(${media.instagramId})\t${media.mediaUrl}`);
+    log.push(`${media.username}\t(${media.instagramId})\t${media.mediaUrl}`);
+  });
   let nextRun = 0;
   let totalRunTime = 0;
   console.log();
-  return Promise.mapSeries(_.shuffle(mediaToBeLiked), mediaToBeInteractedWith => {
+  await Promise.mapSeries(_.shuffle(mediaToBeLiked), async mediaToBeInteractedWith => {
     nextRun = getRandomInt(MIN_DELAY, MAX_DELAY);
     totalRunTime += nextRun;
     if (totalRunTime > MAX_RUNTIME) {
       console.log(`Timing out at ${totalRunTime}ms`);
-      return Promise.resolve();
+      log.push(`Timing out at ${totalRunTime}ms`);
+      return Promise.resolve(log);
     }
-    return Promise.delay(nextRun).then(() => likeMedia(session, mediaToBeInteractedWith, db));
+    await Promise.delay(nextRun)
+    const message = await likeMedia(session, mediaToBeInteractedWith, db);
+    log.push(message);
+    return Promise.resolve();
   });
+
+  return Promise.resolve(log);
 }

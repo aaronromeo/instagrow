@@ -9,6 +9,7 @@ exports.getLatestMediaOfAccounts = async (config, db) => {
     sessionSingleton.session.createSession(config),
     db.handler.getInstance().getAccountsPossiblyRequiringInteraction(),
   ]);
+  const log = [];
 
   const accountsRelatedUserMedia = await Promise.map(accountsRelated, async accountFollowing => {
     return new Client.Feed.UserMedia(session, accountFollowing.instagramId, 1);
@@ -17,7 +18,8 @@ exports.getLatestMediaOfAccounts = async (config, db) => {
   let usersMedia = await Promise.map(accountsRelatedUserMedia, latestUserMedia => {
     return latestUserMedia.get()
       .catch(e => {
-        console.log(`${e.message} trying to retrieve ${latestUserMedia.accountId}`)
+        log.push(`${e.message} trying to retrieve ${latestUserMedia.accountId}`);
+        console.log(`${e.message} trying to retrieve ${latestUserMedia.accountId}`);
       });
   });
 
@@ -48,6 +50,7 @@ exports.getLatestMediaOfAccounts = async (config, db) => {
     }
   });
 
+  log.push(`Account media followed successfully saved for ${usersMedia.length} accounts!`);
   console.log(`Account media followed successfully saved for ${usersMedia.length} accounts!`);
-  return Promise.resolve();
+  return Promise.resolve(log);
 }

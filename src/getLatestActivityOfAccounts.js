@@ -27,31 +27,36 @@ const getSelfLikedUptoLastInteraction = (session, lastInteraction) => {
 }
 
 exports.getLatestActivityOfAccounts = async (config, db) => {
-  const [session, lastInteraction] = await Promise.all([
+  let [session, lastInteraction] = await Promise.all([
     sessionSingleton.session.createSession(config),
     db.handler.getInstance().getMediaWithLastInteraction(),
   ]);
+  const log = [];
 
   if (!lastInteraction || !lastInteraction.username) {
     console.log("No interactions logged");
-    return Promise.resolve();
+    return Promise.resolve("No interactions logged");
   }
 
-  console.log(`Last interaction is for ${lastInteraction.username} on ${lastInteraction.latestMediaUrl} ${lastInteraction.latestMediaId}`);
+  log.push(`Last interaction is for ${lastInteraction.username} on ${lastInteraction.latestMediaUrl} ${lastInteraction.latestMediaId}`)
+  console.log(log);
   const interactions = getSelfLikedUptoLastInteraction(session, lastInteraction);
 
   if (!interactions.length) {
+    log.push("No interactions to update");
     console.log("No interactions to update");
-    return Promise.resolve();
+    return Promise.resolve(log);
   }
   else {
     console.log(`Updating ${interactions.length} interactions \n`);
+    log.push(`Updating ${interactions.length} interactions`);
   }
-  return Promise.map(interactions.reverse(), (interaction) => {
+  await Promise.map(interactions.reverse(), (interaction) => {
     return db.handler.getInstance().getAccountByInstagramId(interaction._params.user.pk)
             .then((account) => {
               lastInteraction = lastInteraction > interaction._params.takenAt ? lastInteraction : interaction._params.takenAt;
               if (account && account.lastInteractionAt < lastInteraction) {
+                log.push(`Updating ${interaction._params.user.username} (${interaction._params.user.pk}) interactions from ${account.lastInteractionAt} to ${lastInteraction}`);
                 console.log(`Updating ${interaction._params.user.username} (${interaction._params.user.pk}) interactions from ${account.lastInteractionAt} to ${lastInteraction}`);
                 return Promise.all([
                   db.handler.getInstance().updateLatestMediaDetails(
@@ -66,10 +71,14 @@ exports.getLatestActivityOfAccounts = async (config, db) => {
                   ),
                 ]);
               } else if (account) {
+                log.push(`Skipping ${interaction._params.user.username} (${interaction._params.user.pk}) lastInteraction (${account.lastInteractionAt}) is greater than ${lastInteraction}`);
                 console.log(`Skipping ${interaction._params.user.username} (${interaction._params.user.pk}) lastInteraction (${account.lastInteractionAt}) is greater than ${lastInteraction}`);
               } else {
+                log.push(`Not following ${interaction._params.user.username} (${interaction._params.user.pk})`);
                 console.log(`Not following ${interaction._params.user.username} (${interaction._params.user.pk})`);
               }
             });
     });
+
+    return Promise.resolve(log);
   }
