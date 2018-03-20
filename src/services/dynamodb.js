@@ -20,20 +20,25 @@ const USER_INITIAL_RECORD = (instagramId, username, isFollowing, isFollower) => 
   isActive: true,
 });
 
-const credentials = new AWS.SharedIniFileCredentials({profile: 'instagrow'});
-AWS.config.update({
+let configOptions = {
   region: "us-east-1",
-  endpoint: "http://localhost:8000"
-});
+};
+if (process.env.IS_OFFLINE) {
+  console.log("in offline mode");
+  configOptions = {
+    region: 'localhost',
+    endpoint: 'http://localhost:8000'
+  }
+}
+AWS.config.update(configOptions);
 AWS.config.setPromisesDependency(Promise);
-AWS.config.credentials = credentials;
 
 
 class DynamoDBService {
   constructor(config) {
     this.config = config;
-    this.db = new AWS.DynamoDB();
-    this.docClient = new AWS.DynamoDB.DocumentClient();
+    this.db = new AWS.DynamoDB({maxRetries: 13, retryDelayOptions: {base: 200}});
+    this.docClient = new AWS.DynamoDB.DocumentClient({maxRetries: 13, retryDelayOptions: {base: 200}});
     this.followingInteractionDeltaInDays = config.followingInteractionDeltaInDays || constants.settings.FOLLOWING_INTERACTION_DELTA_IN_DAYS
     this.followerInteractionDeltaInDays = config.hasOwnProperty("followerInteractionDeltaInDays") ? config.followerInteractionDeltaInDays : constants.settings.FOLLOWER_INTERACTION_DELTA_IN_DAYS
     this.userTableName = `Instagrow-${this.config.username}-Users`;
