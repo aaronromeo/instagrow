@@ -1,10 +1,14 @@
 const Client = require('instagram-private-api').V1;
 const Promise = require('bluebird');
+const fs = require('fs');
 
 let instance = null;
 const createSession = Promise.method((config) => {
+  if (!fs.existsSync("/tmp/cookies")) {
+    fs.mkdirSync("/tmp/cookies");
+  }
   const device = new Client.Device(config.username);
-  const storage = new Client.CookieFileStorage(__dirname + `/../../cookies/${config.username}.json`);
+  const storage = new Client.CookieFileStorage(`/tmp/cookies/${config.username}.json`);
 
   if (instance) return instance;
 
