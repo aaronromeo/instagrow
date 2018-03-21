@@ -8,14 +8,14 @@ commander
 
 
 commander
-  .command('createDatabase <username>')
+  .command('createAccountDatabase <username>')
   .alias('c')
   .description('Create and setup a DB and table to store Instagram user activity')
   .action((username) => {
     const config = require(`../config.${username}.json`);
 
     constants.settings.DATABASE_OBJECT.handler.createInstance(config);
-    constants.settings.DATABASE_OBJECT.handler.getInstance().createDB();
+    constants.settings.DATABASE_OBJECT.handler.getInstance().createAccountDB();
   });
 
 commander

@@ -45,7 +45,33 @@ class DynamoDBService {
     this.pendingMediaTableName = `Instagrow-${this.config.username}-Media-Pending-Likes`;
   };
 
-  createDB() {
+  createGeneralDB() {
+    const CREATE_TABLE_SCRIPT = {
+      TableName : "Instagrow-Cookies",
+      KeySchema: [
+        { AttributeName: "username", KeyType: "HASH"}
+      ],
+      AttributeDefinitions: [
+        { AttributeName: "username", AttributeType: "S" }
+      ],
+      ProvisionedThroughput: {
+        ReadCapacityUnits: 1,
+        WriteCapacityUnits: 1
+      }
+    };
+
+    this.db.createTable(CREATE_TABLE_SCRIPT).promise()
+      .then((data) => {
+        console.log("Created table. Table description JSON:", JSON.stringify(data, null, 2));
+        return new Promise.resolve(data);
+      })
+      .catch((err) => {
+        console.error("Unable to create table. Error JSON:", JSON.stringify(err, null, 2));
+        return new Promise.reject(err);
+      });
+  }
+
+  createAccountDB() {
     const CREATE_USERS_TABLE_SCRIPT = {
       TableName : this.userTableName,
       KeySchema: [
@@ -166,6 +192,41 @@ class DynamoDBService {
       })
       .catch((err) => {
         console.error("Unable to describe table. Error JSON:", JSON.stringify(err, null, 2));
+        return new Promise.reject(err);
+      });
+  }
+
+  getCookiesForUser() {
+    const params = {
+      TableName: "Instagrow-Cookies",
+      Key: {
+        username: this.config.username,
+      },
+    };
+
+    return this.docClient.get(params).promise()
+      .then((data) => {
+        return new Promise.resolve(data.Item && data.Item.cookie);
+      })
+      .catch((err) => {
+        return new Promise.reject(err);
+      });
+  }
+
+  putCookiesForUser(cookie) {
+    const params = {
+      TableName: "Instagrow-Cookies",
+      Item: {
+        username: this.config.username,
+        cookie,
+      },
+    };
+
+    return this.docClient.put(params).promise()
+      .then((data) => {
+        return new Promise.resolve(data);
+      })
+      .catch((err) => {
         return new Promise.reject(err);
       });
   }
