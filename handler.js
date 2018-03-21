@@ -4,18 +4,21 @@ const Promise = require('bluebird');
 
 'use strict';
 
-const verifyInput = async (event) => {
-  if (!event["account"]) {
+const getSetupVars = async (event) => {
+  const username = event["account"] || process.env.ACCOUNT;
+  if (!username) {
     throw new Error("Incorrect configuration - missing account");
   }
+
+  return {
+    username,
+  };
 }
 
 module.exports.getFollowingAndFollowers = async (event, context, callback) => {
   let response = {};
   try {
-    await verifyInput(event, callback);
-
-    const username = event["account"];
+    const {username} = await getSetupVars(event, callback);
     const config = require(`./config.${username}.json`);
     const accountsFollowing = require("./src/getAccountsFollowing");
     const accountFollowers = require("./src/getAccountFollowers");
@@ -36,11 +39,12 @@ module.exports.getFollowingAndFollowers = async (event, context, callback) => {
         message: `Successful run`,
         data: {
           numAccountsFollowing: numAccountsFollowing,
-          numAccountFollowers: numAccountFollower,
+          numAccountFollowers: numAccountFollowers,
         }
       })
     };
   } catch(err) {
+    console.error(`Error ${err}`);
     response = {
       statusCode: 400,
       body: JSON.stringify({
@@ -55,9 +59,7 @@ module.exports.getFollowingAndFollowers = async (event, context, callback) => {
 module.exports.updateInteractionActivity = async (event, context, callback) => {
   let response = {};
   try {
-    await verifyInput(event, callback);
-
-    const username = event["account"];
+    const {username} = await getSetupVars(event, callback);
     const config = require(`./config.${username}.json`);
     const latestActivityOfFollowedAccounts = require("./src/getLatestActivityOfAccounts");
 
@@ -78,6 +80,7 @@ module.exports.updateInteractionActivity = async (event, context, callback) => {
       })
     };
   } catch(err) {
+    console.error(`Error ${err}`);
     response = {
       statusCode: 400,
       body: JSON.stringify({
@@ -92,9 +95,7 @@ module.exports.updateInteractionActivity = async (event, context, callback) => {
 module.exports.addPendingLikeMediaToQueue = async (event, context, callback) => {
   let response = {};
   try {
-    await verifyInput(event, callback);
-
-    const username = event["account"];
+    const {username} = await getSetupVars(event, callback);
     const config = require(`./config.${username}.json`);
     const latestMediaOfFollowedAccounts = require("./src/getLatestMediaOfAccounts");
     const pendingLikeMediaToQueue = require("./src/addPendingLikeMediaToQueue");
@@ -119,6 +120,7 @@ module.exports.addPendingLikeMediaToQueue = async (event, context, callback) => 
       })
     };
   } catch(err) {
+    console.error(`Error ${err}`);
     response = {
       statusCode: 400,
       body: JSON.stringify({
@@ -133,9 +135,7 @@ module.exports.addPendingLikeMediaToQueue = async (event, context, callback) => 
 module.exports.updateLikedMedia = async (event, context, callback) => {
   let response = {};
   try {
-    await verifyInput(event, callback);
-
-    const username = event["account"];
+    const {username} = await getSetupVars(event, callback);
     const config = require(`./config.${username}.json`);
 
     const likedMedia = require("./src/updateLikedMedia");
@@ -157,6 +157,7 @@ module.exports.updateLikedMedia = async (event, context, callback) => {
       })
     };
   } catch(err) {
+    console.error(`Error ${err}`);
     response = {
       statusCode: 400,
       body: JSON.stringify({
