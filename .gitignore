@@ -4,3 +4,4 @@ data/*.json
 data/instagrow.*.db
 scratch.txt
 .serverless/*
+.webpack
