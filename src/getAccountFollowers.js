@@ -3,23 +3,30 @@ const Promise = require('bluebird');
 
 const sessionSingleton = require("./services/sessionSingleton");
 
-exports.getAccountFollowers = async (config, db) => {
-  await db.handler.getInstance().updateFollowerAccountsToInactive();
-  const session = await sessionSingleton.session.createSession(config);
-  const accountId = await session.getAccountId();
-  const feed = await new Client.Feed.AccountFollowers(session, accountId);
-  const followersResults = await feed.get();
-
-  const accountRows = await Promise.map(
-      followersResults,
+exports.getAccountFollowers = (config, db) => db.handler.getInstance().updateFollowerAccountsToInactive()
+  .then(() => sessionSingleton.session.createSession(config))
+  .then((session) => {
+    return [session, session.getAccountId()];
+  })
+  .spread((session, accountId) => {
+    return new Client.Feed.AccountFollowers(session, accountId);
+  })
+  .then((feed) => {
+    return feed.get();
+  })
+  .then((followingResults) => {
+    return Promise.map(
+      followingResults,
       user => db.handler.getInstance().addFollowersAccountOrUpdateUsername(user.id, user._params.username)
     );
-  const badAccounts = accountRows.filter(account => !account);
-  if (!badAccounts.length) {
-    console.log(`List of Accounts followers successfully saved for ${accountRows.length} accounts`);
-    return Promise.resolve(accountRows.length);
-  } else {
-    console.error(`Error saving accounts ${badAccounts}`);
-    return Promise.reject(`Error saving accounts ${badAccounts}`);
-  }
-}
+  })
+  .then((accountRows) => {
+    const badAccounts = accountRows.filter(account => !account);
+    if (!badAccounts.length) {
+      console.log(`List of Accounts followers successfully saved for ${accountRows.length} accounts`);
+      return Promise.resolve();
+    } else {
+      console.log(`Error saving accounts ${badAccounts}`);
+      return Promise.reject();
+    }
+  })
