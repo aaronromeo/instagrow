@@ -25,8 +25,8 @@ const createSession = async (config) => {
 
   const session = await Client.Session.create(device, storage, config.username, config.password);
 
-  cookie = require(`${COOKIE_LOCATION}/${config.username}.json`);
-  await dynamodb.handler.getInstance().putCookiesForUser(cookie);
+  // cookie = require(`${COOKIE_LOCATION}/${config.username}.json`);
+  // await dynamodb.handler.getInstance().putCookiesForUser(cookie);
   instance = session;
   return instance;
 };
