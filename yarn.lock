@@ -3945,6 +3945,12 @@ tough-cookie-filestore@0.0.1:
   dependencies:
     tough-cookie "~0.12.1"
 
+tough-cookie@2.3.4, tough-cookie@~2.3.0:
+  version "2.3.4"
+  resolved "https://registry.yarnpkg.com/tough-cookie/-/tough-cookie-2.3.4.tgz#ec60cee38ac675063ffc97a5c18970578ee83655"
+  dependencies:
+    punycode "^1.4.1"
+
 tough-cookie@^2.3.1, tough-cookie@~2.3.3:
   version "2.3.3"
   resolved "https://registry.yarnpkg.com/tough-cookie/-/tough-cookie-2.3.3.tgz#0b618a5565b6dea90bf3425d04d55edc475a7561"
@@ -3956,12 +3962,6 @@ tough-cookie@~0.12.1:
   resolved "https://registry.yarnpkg.com/tough-cookie/-/tough-cookie-0.12.1.tgz#8220c7e21abd5b13d96804254bd5a81ebf2c7d62"
   dependencies:
     punycode ">=0.2.0"
-
-tough-cookie@~2.3.0:
-  version "2.3.4"
-  resolved "https://registry.yarnpkg.com/tough-cookie/-/tough-cookie-2.3.4.tgz#ec60cee38ac675063ffc97a5c18970578ee83655"
-  dependencies:
-    punycode "^1.4.1"
 
 trim-right@^1.0.1:
   version "1.0.1"

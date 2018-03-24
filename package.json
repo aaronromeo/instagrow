@@ -19,6 +19,7 @@
     "lodash": "4.17.5",
     "moment": "2.20.1",
     "serverless-webpack": "5.1.0",
+    "tough-cookie": "2.3.4",
     "webpack": "3.11.0",
     "webpack-node-externals": "1.6.0"
   },
