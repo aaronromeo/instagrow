@@ -1,0 +1,83 @@
+service: instagrow
+
+frameworkVersion: ">=1.0.0 <2.0.0"
+
+provider:
+  name: aws
+  runtime: nodejs6.10
+  profile: instagrow
+  timeout: 200
+  versionFunctions: false
+  iamRoleStatements: # permissions for all of your functions can be set here
+    - Effect: Allow
+      Action: # Gives permission to DynamoDB tables in a specific region
+        - dynamodb:DescribeTable
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource: "arn:aws:dynamodb:us-east-1:*:*"
+
+functions:
+  getFollowingAndFollowers:
+    handler: handler.getFollowingAndFollowers
+    reservedConcurrency: 1
+    events:
+      - schedule:
+          rate: cron(53 20 ? * 1-5 *)
+          input:
+            account: ${opt:account}
+      - schedule:
+          rate: cron(53 3 ? * 6-7 *)
+          input:
+            account: ${opt:account}
+  updateInteractionActivity:
+    handler: handler.updateInteractionActivity
+    reservedConcurrency: 1
+    events:
+      - schedule:
+          rate: cron(11 21 ? * 1-5 *)
+          input:
+            account: ${opt:account}
+      - schedule:
+          rate: cron(11 4 ? * 6-7 *)
+          input:
+            account: ${opt:account}
+  addPendingLikeMediaToQueue:
+    handler: handler.addPendingLikeMediaToQueue
+    reservedConcurrency: 1
+    events:
+      - schedule:
+          rate: cron(20 21 ? * 1-5 *)
+          input:
+            account: ${opt:account}
+      - schedule:
+          rate: cron(20 4 ? * 6-7 *)
+          input:
+            account: ${opt:account}
+  updateLikedMedia:
+    handler: handler.updateLikedMedia
+    events:
+      - schedule:
+          rate: cron(18/16 0-1,22-23 ? * 1-5 *)
+          input:
+            account: ${opt:account}
+      - schedule:
+          rate: cron(18/16 5-8 ? * 6-7 *)
+          input:
+            account: ${opt:account}
+
+plugins:
+  - serverless-dynamodb-local
+  - serverless-offline
+  - serverless-webpack
+
+custom:
+  webpackIncludeModules: true
+  dynamodb:
+    start:
+      port: 8000
+      migrate: true
+      noStart: true
