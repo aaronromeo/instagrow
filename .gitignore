@@ -2,3 +2,6 @@ config.*.json
 cookies/*.json
 data/*.json
 data/instagrow.*.db
+scratch.txt
+.serverless/*
+.webpack
