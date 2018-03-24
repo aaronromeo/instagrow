@@ -8,6 +8,26 @@ const pathMatch = tough.pathMatch;
 const dynamodb = require('./dynamodb');
 const util = require('util');
 
+
+const saveToDB = async (data, cb) => {
+  const dataJson = JSON.stringify(data);
+  await dynamodb.handler.getInstance().putCookiesForUser(dataJson);
+  cb();
+}
+
+const loadFromDB = async (cb) => {
+  const data = await dynamodb.handler.getInstance().getCookiesForUser();
+  const dataJson = data ? JSON.parse(data) : null;
+  for (const domainName in dataJson) {
+    for (const pathName in dataJson[domainName]) {
+      for (const cookieName in dataJson[domainName][pathName]) {
+        dataJson[domainName][pathName][cookieName] = tough.fromJSON(JSON.stringify(dataJson[domainName][pathName][cookieName]));
+      }
+    }
+  }
+  cb(dataJson);
+}
+
 class DynamoDBCookieStore extends Store {
   constructor() {
     super()
@@ -145,22 +165,3 @@ class DynamoDBCookieStore extends Store {
 module.exports = DynamoDBCookieStore;
 DynamoDBCookieStore.prototype.idx = null;
 DynamoDBCookieStore.prototype.synchronous = true;
-
-const saveToDB = async (data, cb) => {
-  const dataJson = JSON.stringify(data);
-  await dynamodb.handler.getInstance().putCookiesForUser(dataJson);
-  cb();
-}
-
-const loadFromDB = async (cb) => {
-  const data = await dynamodb.handler.getInstance().getCookiesForUser();
-  const dataJson = data ? JSON.parse(data) : null;
-  for (const domainName in dataJson) {
-    for (const pathName in dataJson[domainName]) {
-      for (const cookieName in dataJson[domainName][pathName]) {
-        dataJson[domainName][pathName][cookieName] = tough.fromJSON(JSON.stringify(dataJson[domainName][pathName][cookieName]));
-      }
-    }
-  }
-  cb(dataJson);
-}
