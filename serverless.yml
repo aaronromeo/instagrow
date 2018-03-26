@@ -9,6 +9,11 @@ provider:
   timeout: 200
   versionFunctions: false
   region: ca-central-1
+  environment:
+    ACCOUNT: ${file(./serverless.env.yml):${opt:stage}.ACCOUNT}
+    PASSWORD: ${file(./serverless.env.yml):${opt:stage}.PASSWORD}
+    FOLLOWING_INTERACTION_DELTA_IN_DAYS: ${file(./serverless.env.yml):${opt:stage}.FOLLOWING_INTERACTION_DELTA_IN_DAYS}
+    FOLLOWER_INTERACTION_DELTA_IN_DAYS: ${file(./serverless.env.yml):${opt:stage}.FOLLOWER_INTERACTION_DELTA_IN_DAYS}
   iamRoleStatements: # permissions for all of your functions can be set here
     - Effect: Allow
       Action: # Gives permission to DynamoDB tables in a specific region
@@ -22,51 +27,59 @@ provider:
       Resource: "arn:aws:dynamodb:ca-central-1:*:*"
 
 functions:
+  setUpNewApplication:
+    handler: handler.setUpNewApplication
+  setUpNewUser:
+    handler: handler.setUpNewUserConfig
   getFollowingAndFollowers:
     handler: handler.getFollowingAndFollowers
-    enabled: false
     events:
       - schedule:
+          enabled: false
           rate: cron(53 20 ? * 1-5 *)
           input:
             account: ${opt:account}
       - schedule:
+          enabled: false
           rate: cron(53 3 ? * 6-7 *)
           input:
             account: ${opt:account}
   updateInteractionActivity:
     handler: handler.updateInteractionActivity
-    enabled: false
     events:
       - schedule:
+          enabled: false
           rate: cron(11 21 ? * 1-5 *)
           input:
             account: ${opt:account}
       - schedule:
+          enabled: false
           rate: cron(11 4 ? * 6-7 *)
           input:
             account: ${opt:account}
   addPendingLikeMediaToQueue:
     handler: handler.addPendingLikeMediaToQueue
-    enabled: false
     events:
       - schedule:
+          enabled: false
           rate: cron(20 21 ? * 1-5 *)
           input:
             account: ${opt:account}
       - schedule:
+          enabled: false
           rate: cron(20 4 ? * 6-7 *)
           input:
             account: ${opt:account}
   updateLikedMedia:
     handler: handler.updateLikedMedia
-    enabled: false
     events:
       - schedule:
+          enabled: false
           rate: cron(18/16 0-1,22-23 ? * 1-5 *)
           input:
             account: ${opt:account}
       - schedule:
+          enabled: false
           rate: cron(18/16 5-8 ? * 6-7 *)
           input:
             account: ${opt:account}

@@ -47,12 +47,14 @@ class DynamoDBService {
 
   createGeneralDB() {
     const CREATE_TABLE_SCRIPT = {
-      TableName : "Instagrow-Cookies",
+      TableName : "Instagrow-Config",
       KeySchema: [
-        { AttributeName: "username", KeyType: "HASH"}
+        { AttributeName: "username", KeyType: "HASH"},
+        { AttributeName: "datatype", KeyType: "RANGE"}
       ],
       AttributeDefinitions: [
-        { AttributeName: "username", AttributeType: "S" }
+        { AttributeName: "username", AttributeType: "S" },
+        { AttributeName: "datatype", AttributeType: "S" }
       ],
       ProvisionedThroughput: {
         ReadCapacityUnits: 1,
@@ -113,6 +115,82 @@ class DynamoDBService {
       })
       .catch((err) => {
         console.error("Unable to create table. Error JSON:", JSON.stringify(err, null, 2));
+        return new Promise.reject(err);
+      });
+  }
+
+  putUserEnabled(username, isEnabled) {
+    const params = {
+      TableName: "Instagrow-Config",
+      Item: {
+        username,
+        datatype: 'enabled',
+        datavalue: isEnabled,
+      },
+    };
+
+    return this.docClient.put(params).promise()
+      .then((data) => {
+        return new Promise.resolve(data);
+      })
+      .catch((err) => {
+        return new Promise.reject(err);
+      });
+  }
+
+  putUserAuthentication(username, password) {
+    const params = {
+      TableName: "Instagrow-Config",
+      Item: {
+        username,
+        datatype: 'authentication',
+        datavalue: password,
+      },
+    };
+
+    return this.docClient.put(params).promise()
+      .then((data) => {
+        return new Promise.resolve(data);
+      })
+      .catch((err) => {
+        return new Promise.reject(err);
+      });
+  }
+
+  putUserFollowingInteractionDeltaInDays(username, followingInteractionDeltaInDays) {
+    const params = {
+      TableName: "Instagrow-Config",
+      Item: {
+        username,
+        datatype: 'followingInteractionDeltaInDays',
+        datavalue: followingInteractionDeltaInDays,
+      },
+    };
+
+    return this.docClient.put(params).promise()
+      .then((data) => {
+        return new Promise.resolve(data);
+      })
+      .catch((err) => {
+        return new Promise.reject(err);
+      });
+  }
+
+  putUserFollowerInteractionDeltaInDays(username, followerInteractionDeltaInDays) {
+    const params = {
+      TableName: "Instagrow-Config",
+      Item: {
+        username,
+        datatype: 'followerInteractionDeltaInDays',
+        datavalue: followerInteractionDeltaInDays,
+      },
+    };
+
+    return this.docClient.put(params).promise()
+      .then((data) => {
+        return new Promise.resolve(data);
+      })
+      .catch((err) => {
         return new Promise.reject(err);
       });
   }
@@ -198,9 +276,10 @@ class DynamoDBService {
 
   getCookiesForUser() {
     const params = {
-      TableName: "Instagrow-Cookies",
+      TableName: "Instagrow-Config",
       Key: {
         username: this.config.username,
+        datatype: 'cookies',
       },
     };
 
@@ -215,9 +294,10 @@ class DynamoDBService {
 
   putCookiesForUser(cookie) {
     const params = {
-      TableName: "Instagrow-Cookies",
+      TableName: "Instagrow-Config",
       Item: {
         username: this.config.username,
+        datatype: 'cookies',
         cookie,
       },
     };
@@ -225,6 +305,57 @@ class DynamoDBService {
     return this.docClient.put(params).promise()
       .then((data) => {
         return new Promise.resolve(data);
+      })
+      .catch((err) => {
+        return new Promise.reject(err);
+      });
+  }
+
+  getUsers() {
+    const params = {
+      TableName: "Instagrow-Config",
+      FilterExpression:
+        "datatype=:enabled AND datavalue=:true",
+      ExpressionAttributeValues: {
+        ":true": true,
+        ":enabled": "enabled",
+      }
+    };
+
+    return this.docClient.scan(params).promise()
+      .then((data) => {
+        const usernames = data.Items.map((item) => item.username)
+        return new Promise.resolve(usernames);
+      })
+      .catch((err) => {
+        return new Promise.reject(err);
+      });
+  }
+
+  async getNextUserForFunction(funcName) {
+    const usernames = await this.getUsers();
+    const usernameObject = usernames.reduce((accumulator, username) => {
+      accumulator[`:${username}`] = username;
+      return accumulator;
+    }, {});
+    const params = {
+      TableName: "Instagrow-Config",
+      FilterExpression : `datatype = :functionName AND username IN (${Object.keys(usernameObject).toString()})`,
+      ExpressionAttributeValues : Object.assign({}, usernameObject, {":functionName": `${funcName}Timestamp`}),
+    };
+
+    return this.docClient.scan(params).promise()
+      .then((data) => {
+        const usernameMap = usernames.reduce((accumulator, username) => {
+          const psuedoItem = data.Items.find(item => item.username === username) || {datavalue: 0};
+          const value = psuedoItem.datavalue;
+          if (accumulator.max > value) {
+            accumulator.username = username;
+            accumulator.max = value;
+          }
+          return accumulator;
+        }, {username: null, max: moment().valueOf()});
+        return new Promise.resolve(usernameMap.username);
       })
       .catch((err) => {
         return new Promise.reject(err);

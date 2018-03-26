@@ -5,3 +5,4 @@ data/instagrow.*.db
 scratch.txt
 .serverless/*
 .webpack
+serverless.env.yml
