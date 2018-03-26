@@ -6,14 +6,14 @@ const DynamoDBCookieStore = require('./DynamoDBCookieStore');
 
 let instance = null;
 
-const createSession = async (config) => {
-  const device = new Client.Device(config.username);
-  const cookieStore = new DynamoDBCookieStore();
+const createSession = async ({username, password}) => {
+  const device = new Client.Device(username);
+  const cookieStore = new DynamoDBCookieStore(username);
   const storage = new Client.CookieStorage(cookieStore);
 
   if (instance) return instance;
 
-  const session = await Client.Session.create(device, storage, config.username, config.password);
+  const session = await Client.Session.create(device, storage, username, password);
 
   instance = session;
   return instance;

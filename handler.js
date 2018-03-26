@@ -1,6 +1,7 @@
 require('dotenv').config();
-const constants = require("./src/constants");
 const Promise = require('bluebird');
+const constants = require("./src/constants");
+const dynamoDBHandler = require("./src/services/dynamodb").handler;
 
 const getSetupVars = async (event) => {
   const username = event["account"] || process.env.ACCOUNT;
@@ -19,8 +20,8 @@ module.exports.setUpNewApplication = async (event, context, callback) => {
     const {username} = await getSetupVars(event, callback);
     const config = require(`./config.${username}.json`);
 
-    constants.settings.DATABASE_OBJECT.handler.createInstance(config);
-    constants.settings.DATABASE_OBJECT.handler.getInstance().createGeneralDB();
+    dynamoDBHandler.createInstance(config);
+    dynamoDBHandler.getInstance().createGeneralDB();
 
     response = {
       statusCode: 200,
@@ -58,11 +59,11 @@ module.exports.setUpNewUserConfig = async (event, context, callback) => {
       throw new Error("Incorrect configuration - missing password");
     }
 
-    constants.settings.DATABASE_OBJECT.handler.createInstance(config);
-    await constants.settings.DATABASE_OBJECT.handler.getInstance().putUserAuthentication(username, password);
-    await constants.settings.DATABASE_OBJECT.handler.getInstance().putUserEnabled(username, false);
-    await constants.settings.DATABASE_OBJECT.handler.getInstance().putUserFollowingInteractionDeltaInDays(username, followingInteractionDeltaInDays);
-    await constants.settings.DATABASE_OBJECT.handler.getInstance().putUserFollowerInteractionDeltaInDays(username, followerInteractionDeltaInDays);
+    dynamoDBHandler.createInstance(config);
+    await dynamoDBHandler.getInstance().putUserAuthentication(username, password);
+    await dynamoDBHandler.getInstance().putUserEnabled(username, false);
+    await dynamoDBHandler.getInstance().putUserFollowingInteractionDeltaInDays(username, followingInteractionDeltaInDays);
+    await dynamoDBHandler.getInstance().putUserFollowerInteractionDeltaInDays(username, followerInteractionDeltaInDays);
 
     response = {
       statusCode: 200,
@@ -86,29 +87,28 @@ module.exports.setUpNewUserConfig = async (event, context, callback) => {
 module.exports.getFollowingAndFollowers = async (event, context, callback) => {
   let response = {};
   try {
-    const {username} = await getSetupVars(event, callback);
-    const config = require(`./config.${username}.json`);
     const accountsFollowing = require("./src/getAccountsFollowing");
     const accountFollowers = require("./src/getAccountFollowers");
 
-    const getFollowingAndFollowersAsync = async () => {
-      const numAccountsFollowing = await accountsFollowing.getAccountsFollowing(config, constants.settings.DATABASE_OBJECT);
-      const numAccountFollowers = await accountFollowers.getAccountFollowers(config, constants.settings.DATABASE_OBJECT);
-
-      return [numAccountsFollowing, numAccountFollowers]
+    const getFollowingAndFollowersAsync = async ({username, password}) => {
+      const numAccountsFollowing = await accountsFollowing.getAccountsFollowing({username, password});
+      const numAccountFollowers = await accountFollowers.getAccountFollowers({username, password});
+      return [numAccountsFollowing, numAccountFollowers];
     }
 
-    constants.settings.DATABASE_OBJECT.handler.createInstance(config);
-    const temp = await constants.settings.DATABASE_OBJECT.handler.getInstance().getNextUserForFunction('getFollowingAndFollowers');
-    // const temp = constants.settings.DATABASE_OBJECT.handler.getInstance().getNextUserForFunction("getFollowingAndFollowers");
+    dynamoDBHandler.createInstance();
+    const username = await dynamoDBHandler.getInstance().getNextUserForFunction('getFollowingAndFollowers');
+    if (!username) throw new Error("No username defined for function 'getFollowingAndFollowers'");
 
-    throw new Error(JSON.stringify(temp));
+    const password = await dynamoDBHandler.getInstance().getPasswordForUser(username);
+    if (!password) throw new Error("No password defined for function 'getFollowingAndFollowers'");
 
-    const [numAccountsFollowing, numAccountFollowers] = await getFollowingAndFollowersAsync();
+    const [numAccountsFollowing, numAccountFollowers] = await getFollowingAndFollowersAsync({username, password});
+    await dynamoDBHandler.getInstance().putTimestampForFunction(username, 'getFollowingAndFollowers');
     response = {
       statusCode: 200,
       body: JSON.stringify({
-        message: `Successful run`,
+        message: "Successful run",
         data: {
           numAccountsFollowing: numAccountsFollowing,
           numAccountFollowers: numAccountFollowers,
@@ -139,7 +139,7 @@ module.exports.updateInteractionActivity = async (event, context, callback) => {
       return await latestActivityOfFollowedAccounts.getLatestActivityOfAccounts(config, constants.settings.DATABASE_OBJECT);
     }
 
-    constants.settings.DATABASE_OBJECT.handler.createInstance(config);
+    dynamoDBHandler.createInstance(config);
 
     const log = await updateInteractionActivityAsync();
     response = {
@@ -179,7 +179,7 @@ module.exports.addPendingLikeMediaToQueue = async (event, context, callback) => 
       return log;
     }
 
-    constants.settings.DATABASE_OBJECT.handler.createInstance(config);
+    dynamoDBHandler.createInstance(config);
 
     const log = await addPendingLikeMediaToQueueAsync();
     response = {
@@ -216,7 +216,7 @@ module.exports.updateLikedMedia = async (event, context, callback) => {
       return await likedMedia.updateLikedMedia(config, constants.settings.DATABASE_OBJECT);
     }
 
-    constants.settings.DATABASE_OBJECT.handler.createInstance(config);
+    dynamoDBHandler.createInstance(config);
 
     const log = await updateLikedMediaAsync();
     response = {

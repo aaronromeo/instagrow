@@ -35,15 +35,36 @@ AWS.config.setPromisesDependency(Promise);
 
 
 class DynamoDBService {
-  constructor(config) {
-    this.config = config;
+  constructor() {
     this.db = new AWS.DynamoDB({maxRetries: 13, retryDelayOptions: {base: 200}});
     this.docClient = new AWS.DynamoDB.DocumentClient({maxRetries: 13, retryDelayOptions: {base: 200}});
-    this.followingInteractionDeltaInDays = config.followingInteractionDeltaInDays || constants.settings.FOLLOWING_INTERACTION_DELTA_IN_DAYS
-    this.followerInteractionDeltaInDays = config.hasOwnProperty("followerInteractionDeltaInDays") ? config.followerInteractionDeltaInDays : constants.settings.FOLLOWER_INTERACTION_DELTA_IN_DAYS
-    this.userTableName = `Instagrow-${this.config.username}-Users`;
-    this.pendingMediaTableName = `Instagrow-${this.config.username}-Media-Pending-Likes`;
   };
+
+  async followingInteractionDeltaInDays(username) {
+    const params = {
+      TableName: "Instagrow-Config",
+      Key: {
+        username: username,
+        datatype: 'followingInteractionDeltaInDays',
+      },
+    };
+
+    const data = await this.docClient.get(params);
+    return (data.Item && data.Item.datavalue) || constants.settings.FOLLOWING_INTERACTION_DELTA_IN_DAYS;
+  }
+
+  async followerInteractionDeltaInDays(username) {
+    const params = {
+      TableName: "Instagrow-Config",
+      Key: {
+        username: username,
+        datatype: 'followerInteractionDeltaInDays',
+      },
+    };
+
+    const data = await this.docClient.get(params);
+    return (data.Item && data.Item.datavalue) || constants.settings.FOLLOWER_INTERACTION_DELTA_IN_DAYS;
+  }
 
   createGeneralDB() {
     const CREATE_TABLE_SCRIPT = {
@@ -73,9 +94,17 @@ class DynamoDBService {
       });
   }
 
-  createAccountDB() {
+  getUserTableName(username) {
+    return `Instagrow-${username}-Users`;
+  }
+
+  getPendingMediaTableName(username) {
+    return `Instagrow-${username}-Media-Pending-Likes`;
+  }
+
+  createAccountDB(username) {
     const CREATE_USERS_TABLE_SCRIPT = {
-      TableName : this.userTableName,
+      TableName : this.getUserTableName(username),
       KeySchema: [
         { AttributeName: "instagramId", KeyType: "HASH"}
       ],
@@ -89,7 +118,7 @@ class DynamoDBService {
     };
 
     const CREATE_PENDING_MEDIA_TABLE_SCRIPT = {
-      TableName : this.pendingMediaTableName,
+      TableName : this.getPendingMediaTableName(username),
       KeySchema: [
         { AttributeName: "mediaId", KeyType: "HASH"},
         { AttributeName: "instagramId", KeyType: "RANGE"}
@@ -195,11 +224,11 @@ class DynamoDBService {
       });
   }
 
-  deleteDB() {
-    return this.db.deleteTable({TableName : this.userTableName}).promise()
+  deleteDB(username) {
+    return this.db.deleteTable({TableName : this.getUserTableName(username)}).promise()
       .then((data) => {
         console.log("Deleted table. Table description JSON:", JSON.stringify(data, null, 2));
-        return this.db.deleteTable({TableName : this.pendingMediaTableName}).promise();
+        return this.db.deleteTable({TableName : this.getPendingMediaTableName(username)}).promise();
       })
       .then((data) => {
         console.log("Deleted table. Table description JSON:", JSON.stringify(data, null, 2));
@@ -211,11 +240,11 @@ class DynamoDBService {
       });
   }
 
-  createBackup() {
-    const backupName = `${this.userTableName}-Bkup-${moment().valueOf()}`
+  createBackup(username) {
+    const backupName = `${this.getUserTableName(username)}-Bkup-${moment().valueOf()}`
     const backupParams = {
       BackupName: backupName,
-      TableName: this.userTableName,
+      TableName: this.getUserTableName(username),
     };
 
     return this.db.createBackup(backupParams).promise()
@@ -225,19 +254,19 @@ class DynamoDBService {
       })
   }
 
-  importData() {
-    const backupName = `${this.userTableName}-Bkup-${moment().valueOf()}`
+  importData(username) {
+    const backupName = `${this.getUserTableName(username)}-Bkup-${moment().valueOf()}`
     const backupParams = {
       BackupName: backupName,
-      TableName: this.userTableName,
+      TableName: this.getUserTableName(username),
     };
 
     const dataMarshal = new dataMarshalService.service.DataMarshal();
-    dataMarshal.importData(`data/dump-${this.config.username}-dynamodb.json`);
+    dataMarshal.importData(`data/dump-${username}-dynamodb.json`);
 
     return Promise.map(dataMarshal.records, async (record) => {
       const putParams = {
-        TableName: this.userTableName,
+        TableName: this.getUserTableName(username),
         Item: record,
       };
 
@@ -252,7 +281,7 @@ class DynamoDBService {
   }
 
   exportData() {
-    return this.db.describeTable({ "TableName": this.userTableName }).promise()
+    return this.db.describeTable({ "TableName": this.getUserTableName(username) }).promise()
       .then((tableDescription) => {
         console.log("Describe table successful. Table description JSON:", JSON.stringify(tableDescription, null, 2));
         return this.docClient.scan(tableDescription.Table).promise()
@@ -261,7 +290,7 @@ class DynamoDBService {
             data.Items.forEach((record) => {
               dataMarshal.addRecord(record)
             })
-            dataMarshal.exportData(`data/dump-${this.config.username}-dynamodb.json`);
+            dataMarshal.exportData(`data/dump-${username}-dynamodb.json`);
             return new Promise.resolve(data);
           })
           .catch((err) => {
@@ -274,31 +303,31 @@ class DynamoDBService {
       });
   }
 
-  getCookiesForUser() {
+  getCookiesForUser(username) {
     const params = {
       TableName: "Instagrow-Config",
       Key: {
-        username: this.config.username,
+        username: username,
         datatype: 'cookies',
       },
     };
 
     return this.docClient.get(params).promise()
       .then((data) => {
-        return new Promise.resolve(data.Item && data.Item.cookie);
+        return new Promise.resolve(data.Item && data.Item.datavalue);
       })
       .catch((err) => {
         return new Promise.reject(err);
       });
   }
 
-  putCookiesForUser(cookie) {
+  putCookiesForUser(username, cookie) {
     const params = {
       TableName: "Instagrow-Config",
       Item: {
-        username: this.config.username,
+        username: username,
         datatype: 'cookies',
-        cookie,
+        datavalue: cookie,
       },
     };
 
@@ -309,6 +338,19 @@ class DynamoDBService {
       .catch((err) => {
         return new Promise.reject(err);
       });
+  }
+
+  async getPasswordForUser(username) {
+    const params = {
+      TableName: "Instagrow-Config",
+      Key: {
+        username: username,
+        datatype: 'authentication',
+      },
+    };
+
+    const data = await this.docClient.get(params).promise();
+    return data.Item && data.Item.datavalue;
   }
 
   getUsers() {
@@ -362,9 +404,23 @@ class DynamoDBService {
       });
   }
 
-  getMediaWithLastInteraction() {
+  async putTimestampForFunction(username, funcName) {
     const params = {
-      TableName: this.userTableName,
+      TableName: "Instagrow-Config",
+      Item: {
+        username: username,
+        datatype: `${funcName}Timestamp`,
+        datavalue: moment().valueOf(),
+      },
+    };
+
+    const data = await this.docClient.put(params).promise()
+    return new Promise.resolve(data);
+  }
+
+  getMediaWithLastInteraction(username) {
+    const params = {
+      TableName: this.getUserTableName(username),
       FilterExpression:
         "lastInteractionAt > :li",
       ExpressionAttributeValues: {
@@ -386,37 +442,32 @@ class DynamoDBService {
       });
   };
 
-  getAccountByInstagramId(instagramId) {
+  async getAccountByInstagramId(username, instagramId) {
     const params = {
-      TableName: this.userTableName,
+      TableName: this.getUserTableName(username),
       Key:{
         instagramId: instagramId.toString(),
       }
     };
 
-    return this.docClient.get(params).promise()
-      .then((data) => {
-        return new Promise.resolve(data.Item);
-      })
-      .catch((err) => {
-        return new Promise.reject(err);
-      });
+    const data = await this.docClient.get(params).promise();
+    return new Promise.resolve(data.Item);
   };
 
-  getAccountsPossiblyRequiringInteraction() {
-    const followerInteractionAgeThreshold = this.followerInteractionDeltaInDays && moment().subtract(this.followerInteractionDeltaInDays, 'd');
+  getAccountsPossiblyRequiringInteraction(username) {
+    const followerInteractionAgeThreshold = this.followerInteractionDeltaInDays() && moment().subtract(this.followerInteractionDeltaInDays(), 'd');
     const followingClause = "lastInteractionAt < :lifollowing AND isActive=:true AND isFollowing=:true";
     const followerClause = followerInteractionAgeThreshold ? "lastInteractionAt < :lifollower AND isActive=:true AND isFollower=:true" : "";
     const filterExpression = followerClause ? `(${followingClause}) OR (${followerClause})` : followingClause;
     const expressionAttributeValues = {
-      ":lifollowing": moment().subtract(this.followingInteractionDeltaInDays, 'd').valueOf(),
+      ":lifollowing": moment().subtract(this.followingInteractionDeltaInDays(), 'd').valueOf(),
       ":true": true,
     }
     if (followerInteractionAgeThreshold) {
       expressionAttributeValues[":lifollower"] = followerInteractionAgeThreshold.valueOf();
     }
     const params = {
-      TableName: this.userTableName,
+      TableName: this.getUserTableName(username),
       FilterExpression: filterExpression,
       ExpressionAttributeValues: expressionAttributeValues,
     };
@@ -430,10 +481,10 @@ class DynamoDBService {
       });
   };
 
-  getAccountsToBeLiked() {
+  getAccountsToBeLiked(username) {
     const maximumAgeOfContentConsidered = moment().subtract(1, 'w');
-    const followingInteractionAgeThreshold = moment().subtract(this.followingInteractionDeltaInDays, 'd');
-    const followerInteractionAgeThreshold = this.followerInteractionDeltaInDays && moment().subtract(this.followerInteractionDeltaInDays, 'd');
+    const followingInteractionAgeThreshold = moment().subtract(this.followingInteractionDeltaInDays(), 'd');
+    const followerInteractionAgeThreshold = this.followerInteractionDeltaInDays() && moment().subtract(this.followerInteractionDeltaInDays(), 'd');
     const followingClause = "latestMediaCreatedAt > :lmca AND lastInteractionAt < latestMediaCreatedAt AND lastInteractionAt < :lifollowing AND isActive=:true AND isFollowing=:true";
     const followerClause = followerInteractionAgeThreshold ? "latestMediaCreatedAt > :lmca AND lastInteractionAt < latestMediaCreatedAt AND lastInteractionAt < :lifollower AND isActive=:true AND isFollower=:true" : "";
     const filterExpression = followerClause ? `(${followingClause}) OR (${followerClause})` : followingClause;
@@ -447,7 +498,7 @@ class DynamoDBService {
     }
 
     const params = {
-      TableName: this.userTableName,
+      TableName: this.getUserTableName(username),
       FilterExpression: filterExpression,
       ExpressionAttributeValues: expressionAttributeValues,
     };
@@ -461,17 +512,18 @@ class DynamoDBService {
       });
    };
 
-  updateFollowerAccountsToInactive() {
+  async updateFollowerAccountsToInactive(username) {
+    const tableName = this.getUserTableName(username);
     const scanParams = {
-      TableName: this.userTableName,
+      TableName: tableName,
       FilterExpression: "isFollower=:true",
       ExpressionAttributeValues: {
         ":true": true,
       }
     };
 
-    const updateParams = (instagramId) => ({
-      TableName: this.userTableName,
+    const updateParams = (username, instagramId) => ({
+      TableName: tableName,
       Key: {instagramId: instagramId},
       UpdateExpression: "set isActive = :false, isFollower = :false",
       ExpressionAttributeValues:{
@@ -480,23 +532,25 @@ class DynamoDBService {
       ReturnValues:"UPDATED_NEW",
     });
 
-    return this.docClient.scan(scanParams).promise()
-      .then((data) => Promise.map(data.Items, (account) => this.docClient.update(
-        updateParams(account.instagramId.toString()))
-      ));
+    const data = await this.docClient.scan(scanParams).promise();
+    if (!data.Items) return;
+    await data.Items.forEach(async (account) => {
+      await this.docClient.update(updateParams(account.instagramId.toString()))
+    });
   }
 
-  updateFollowingAccountsToInactive() {
+  async updateFollowingAccountsToInactive(username) {
+    const tableName = this.getUserTableName(username);
     const scanParams = {
-      TableName: this.userTableName,
+      TableName: tableName,
       FilterExpression: "isFollowing=:true",
       ExpressionAttributeValues: {
         ":true": true,
       }
     };
 
-    const updateParams = (instagramId) => ({
-      TableName: this.userTableName,
+    const updateParams = (username, instagramId) => ({
+      TableName: tableName,
       Key: {instagramId: instagramId},
       UpdateExpression: "set isActive = :false, isFollowing = :false",
       ExpressionAttributeValues:{
@@ -505,82 +559,71 @@ class DynamoDBService {
       ReturnValues:"UPDATED_NEW",
     });
 
-    return this.docClient.scan(scanParams).promise()
-      .then((data) => Promise.map(data.Items, (account) => this.docClient.update(
-        updateParams(account.instagramId.toString()))
-      ));
+    const data = await this.docClient.scan(scanParams).promise();
+    if (!data.Items) return;
+    await data.Items.forEach(async (account) => {
+      await this.docClient.update(updateParams(account.instagramId.toString()))
+    });
   }
 
-  addFollowersAccountOrUpdateUsername(instagramId, username) {
-    return this.getAccountByInstagramId(instagramId)
-      .then((account) => {
-        if (account) {
-          const params = {
-            TableName: this.userTableName,
-            Key: {instagramId: instagramId.toString()},
-            UpdateExpression: "set username = :u, isFollower = :true, isActive = :true",
-            ExpressionAttributeValues:{
-              ":u": username,
-              ":true": true,
-            },
-            ReturnValues:"UPDATED_NEW"
-          };
-          return this.docClient.update(params).promise()
-            .then(() => {
-              return new Promise.resolve({instagramId: instagramId, username: username})
-            });
-        } else {
-          const params = {
-            TableName: this.userTableName,
-            Item: USER_INITIAL_RECORD(instagramId, username, false, true)
-          };
-          return this.docClient.put(params).promise()
-            .then(() => {
-              return new Promise.resolve({instagramId: instagramId, username: username})
-            });
-        }
-      })
+  async addFollowersAccountOrUpdateUsername(username, instagramId, followerUsername) {
+    const account = await this.getAccountByInstagramId(username, instagramId);
+    if (account) {
+      const params = {
+        TableName: this.getUserTableName(username),
+        Key: {instagramId: instagramId.toString()},
+        UpdateExpression: "set username = :u, isFollower = :true, isActive = :true",
+        ExpressionAttributeValues:{
+          ":u": followerUsername,
+          ":true": true,
+        },
+        ReturnValues:"UPDATED_NEW"
+      };
+      await this.docClient.update(params).promise();
+      return new Promise.resolve({instagramId: instagramId, username: followerUsername});
+    } else {
+      const params = {
+        TableName: this.getUserTableName(username),
+        Item: USER_INITIAL_RECORD(instagramId, followerUsername, false, true)
+      };
+      await this.docClient.put(params).promise();
+      return new Promise.resolve({instagramId: instagramId, username: followerUsername});
+    }
   }
 
-  addFollowingAccountOrUpdateUsername(instagramId, username) {
-    return this.getAccountByInstagramId(instagramId)
-      .then((account) => {
-        if (account) {
-          const params = {
-            TableName: this.userTableName,
-            Key: {instagramId: instagramId.toString()},
-            UpdateExpression: "set username = :u, isFollowing = :true, isActive = :true",
-            ExpressionAttributeValues:{
-              ":u": username,
-              ":true": true,
-            },
-            ReturnValues:"UPDATED_NEW"
-          };
-          return this.docClient.update(params).promise()
-            .then(() => {
-              return new Promise.resolve({instagramId: instagramId, username: username})
-            });
-        } else {
-          const params = {
-            TableName: this.userTableName,
-            Item: USER_INITIAL_RECORD(instagramId, username, true, false)
-          };
-          return this.docClient.put(params).promise()
-            .then(() => {
-              return new Promise.resolve({instagramId: instagramId, username: username})
-            });
-        }
-      })
+  async addFollowingAccountOrUpdateUsername(username, instagramId, followingUsername) {
+    const account = await this.getAccountByInstagramId(username, instagramId);
+    if (account) {
+      const params = {
+        TableName: this.getUserTableName(username),
+        Key: {instagramId: instagramId.toString()},
+        UpdateExpression: "set username = :u, isFollowing = :true, isActive = :true",
+        ExpressionAttributeValues:{
+          ":u": followingUsername,
+          ":true": true,
+        },
+        ReturnValues:"UPDATED_NEW"
+      };
+      await this.docClient.update(params).promise();
+      return new Promise.resolve({instagramId: instagramId, username: followingUsername});
+    } else {
+      const params = {
+        TableName: this.getUserTableName(username),
+        Item: USER_INITIAL_RECORD(instagramId, followingUsername, true, false)
+      };
+      await this.docClient.put(params).promise();
+      return new Promise.resolve({instagramId: instagramId, username: followingUsername});
+    }
   }
 
-  addLatestMediaToPendingTable(instagramId, mediaId, mediaUrl, username) {
+  addLatestMediaToPendingTable(username, instagramId, mediaId, mediaUrl, followingUsername) {
     const params = {
-      TableName: this.pendingMediaTableName,
+      TableName: this.getPendingMediaTableName(username),
       Item: {
         instagramId: instagramId.toString(),
         mediaId,
         mediaUrl,
-        username,
+        followingUsername,
       },
     };
     return this.docClient.put(params).promise()
@@ -589,9 +632,9 @@ class DynamoDBService {
       });
   }
 
-  getLatestMediaFromPendingTable(limit=null) {
+  getLatestMediaFromPendingTable(username, limit=null) {
     const params = {
-      TableName: this.pendingMediaTableName,
+      TableName: this.getPendingMediaTableName(username),
     };
     if (limit) {
       params['Limit'] = limit;
@@ -602,9 +645,9 @@ class DynamoDBService {
       });
   }
 
-  deleteMediaFromPendingTable(instagramId, mediaId) {
+  deleteMediaFromPendingTable(username, instagramId, mediaId) {
     const params = {
-      TableName: this.pendingMediaTableName,
+      TableName: this.getPendingMediaTableName(username),
       Key: {
         instagramId,
         mediaId,
@@ -616,9 +659,9 @@ class DynamoDBService {
       });
   }
 
-  updateLatestMediaDetails(instagramId, latestMediaId, latestMediaUrl, latestMediaCreatedAt) {
+  updateLatestMediaDetails(username, instagramId, latestMediaId, latestMediaUrl, latestMediaCreatedAt) {
     const params = {
-      TableName: this.userTableName,
+      TableName: this.getUserTableName(username),
       Key: {instagramId: instagramId.toString()},
       UpdateExpression: "set latestMediaId = :lmi, latestMediaUrl = :lmu, latestMediaCreatedAt = :lmca",
       ExpressionAttributeValues:{
@@ -632,9 +675,9 @@ class DynamoDBService {
       .then(() => new Promise.resolve({instagramId: instagramId}));
   }
 
-  updateLastInteration(instagramId, latestInteraction) {
+  updateLastInteration(username, instagramId, latestInteraction) {
     const params = {
-      TableName: this.userTableName,
+      TableName: this.getUserTableName(username),
       Key: {instagramId: instagramId.toString()},
       UpdateExpression: "set lastInteractionAt = :li",
       ExpressionAttributeValues:{
@@ -650,8 +693,8 @@ class DynamoDBService {
 }
 
 let instance = null;
-const createInstance = (config) => {
-  instance = new DynamoDBService(config);
+const createInstance = () => {
+  instance = new DynamoDBService();
   return instance;
 }
 const getInstance = () => instance;
