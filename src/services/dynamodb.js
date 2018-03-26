@@ -21,7 +21,7 @@ const USER_INITIAL_RECORD = (instagramId, username, isFollowing, isFollower) => 
 });
 
 let configOptions = {
-  region: "us-east-1",
+  region: "ca-central-1",
 };
 if (process.env.IS_OFFLINE) {
   console.log("in offline mode");
