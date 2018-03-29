@@ -10,10 +10,8 @@ exports.getAccountFollowers = async ({username, password}) => {
   const feed = await new Client.Feed.AccountFollowers(session, accountId);
   const followersResults = await feed.get();
 
-  const accountRows = await followersResults.map((user) =>{
-    return dynamoDBHandler.getInstance().addFollowersAccountOrUpdateUsername(username, user.id, user._params.username)
-  });
- const badAccounts = accountRows.filter(account => !account);
+  const accountRows = await dynamoDBHandler.getInstance().addFollowersAccountOrUpdateUsernameBatch(username, followersResults);
+  const badAccounts = accountRows.filter(account => !account);
   if (!badAccounts.length) {
     console.log(`List of Accounts followers successfully saved for ${accountRows.length} accounts`);
     return Promise.resolve(accountRows.length);

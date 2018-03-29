@@ -9,6 +9,12 @@ provider:
   timeout: 200
   versionFunctions: false
   region: ca-central-1
+  vpc:
+    securityGroupIds:
+      - instagrow
+    subnetIds:
+      - instagrow-public-subnet
+      - instagrow-private-subnet
   environment:
     ACCOUNT: ${file(./serverless.env.yml):${opt:stage}.ACCOUNT}
     PASSWORD: ${file(./serverless.env.yml):${opt:stage}.PASSWORD}
@@ -31,17 +37,19 @@ functions:
     handler: handler.setUpNewApplication
   setUpNewUser:
     handler: handler.setUpNewUserConfig
+  setUpScalingPolicy:
+    handler: handler.setUpScalingPolicy
   getFollowingAndFollowers:
     handler: handler.getFollowingAndFollowers
     events:
       - schedule:
-          enabled: false
+          enabled: true
           rate: cron(53 20 ? * 1-5 *)
           input:
             account: ${opt:account}
       - schedule:
-          enabled: false
-          rate: cron(53 3 ? * 6-7 *)
+          enabled: true
+          rate: cron(43 3 ? * 6-7 *)
           input:
             account: ${opt:account}
   updateInteractionActivity:

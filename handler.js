@@ -17,10 +17,7 @@ const getSetupVars = async (event) => {
 module.exports.setUpNewApplication = async (event, context, callback) => {
   let response = {};
   try {
-    const {username} = await getSetupVars(event, callback);
-    const config = require(`./config.${username}.json`);
-
-    dynamoDBHandler.createInstance(config);
+    dynamoDBHandler.createInstance();
     dynamoDBHandler.getInstance().createGeneralDB();
 
     response = {
@@ -49,7 +46,6 @@ module.exports.setUpNewUserConfig = async (event, context, callback) => {
     const password = process.env.PASSWORD;
     const followingInteractionDeltaInDays = process.env.FOLLOWING_INTERACTION_DELTA_IN_DAYS || constants.FOLLOWING_INTERACTION_DELTA_IN_DAYS;
     const followerInteractionDeltaInDays = process.env.FOLLOWER_INTERACTION_DELTA_IN_DAYS || constants.FOLLOWER_INTERACTION_DELTA_IN_DAYS;
-    const config = require(`./config.${username}.json`);
 
     if (!username) {
       throw new Error("Incorrect configuration - missing username");
@@ -59,11 +55,42 @@ module.exports.setUpNewUserConfig = async (event, context, callback) => {
       throw new Error("Incorrect configuration - missing password");
     }
 
-    dynamoDBHandler.createInstance(config);
+    dynamoDBHandler.createInstance();
     await dynamoDBHandler.getInstance().putUserAuthentication(username, password);
     await dynamoDBHandler.getInstance().putUserEnabled(username, false);
     await dynamoDBHandler.getInstance().putUserFollowingInteractionDeltaInDays(username, followingInteractionDeltaInDays);
     await dynamoDBHandler.getInstance().putUserFollowerInteractionDeltaInDays(username, followerInteractionDeltaInDays);
+
+    response = {
+      statusCode: 200,
+      body: JSON.stringify({
+        message: `Successful run`,
+      })
+    };
+  } catch(err) {
+    console.error(`Error ${err}`);
+    response = {
+      statusCode: 400,
+      body: JSON.stringify({
+        message: err,
+      }),
+    };
+  } finally {
+    callback(null, response);
+  }
+};
+
+module.exports.setUpScalingPolicy = async (event, context, callback) => {
+  let response = {};
+  try {
+    const username = process.env.ACCOUNT;
+
+    if (!username) {
+      throw new Error("Incorrect configuration - missing username");
+    }
+
+    dynamoDBHandler.createInstance();
+    await dynamoDBHandler.getInstance().createAccountScalingPolicy(username);
 
     response = {
       statusCode: 200,
@@ -139,7 +166,7 @@ module.exports.updateInteractionActivity = async (event, context, callback) => {
       return await latestActivityOfFollowedAccounts.getLatestActivityOfAccounts(config, constants.settings.DATABASE_OBJECT);
     }
 
-    dynamoDBHandler.createInstance(config);
+    dynamoDBHandler.createInstance();
 
     const log = await updateInteractionActivityAsync();
     response = {
@@ -179,7 +206,7 @@ module.exports.addPendingLikeMediaToQueue = async (event, context, callback) => 
       return log;
     }
 
-    dynamoDBHandler.createInstance(config);
+    dynamoDBHandler.createInstance();
 
     const log = await addPendingLikeMediaToQueueAsync();
     response = {
@@ -216,7 +243,7 @@ module.exports.updateLikedMedia = async (event, context, callback) => {
       return await likedMedia.updateLikedMedia(config, constants.settings.DATABASE_OBJECT);
     }
 
-    dynamoDBHandler.createInstance(config);
+    dynamoDBHandler.createInstance();
 
     const log = await updateLikedMediaAsync();
     response = {
