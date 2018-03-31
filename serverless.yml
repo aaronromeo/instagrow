@@ -11,10 +11,10 @@ provider:
   region: ca-central-1
   vpc:
     securityGroupIds:
-      - instagrow
+      - sg-58292b30
     subnetIds:
-      - instagrow-public-subnet
-      - instagrow-private-subnet
+      - subnet-252a395e
+      - subnet-722a3909
   environment:
     ACCOUNT: ${file(./serverless.env.yml):${opt:stage}.ACCOUNT}
     PASSWORD: ${file(./serverless.env.yml):${opt:stage}.PASSWORD}
@@ -44,58 +44,46 @@ functions:
     events:
       - schedule:
           enabled: true
-          rate: cron(53 20 ? * 1-5 *)
-          input:
-            account: ${opt:account}
+          rate: cron(*/20 0-4 ? * * *)
       - schedule:
           enabled: true
-          rate: cron(43 3 ? * 6-7 *)
-          input:
-            account: ${opt:account}
+          rate: cron(*/20 11-13 ? * 1-5 *)
+      - schedule:
+          enabled: true
+          rate: cron(*/20 13-16 ? * 6-7 *)
   updateInteractionActivity:
     handler: handler.updateInteractionActivity
     events:
       - schedule:
           enabled: false
           rate: cron(11 21 ? * 1-5 *)
-          input:
-            account: ${opt:account}
       - schedule:
           enabled: false
           rate: cron(11 4 ? * 6-7 *)
-          input:
-            account: ${opt:account}
   addPendingLikeMediaToQueue:
     handler: handler.addPendingLikeMediaToQueue
     events:
       - schedule:
           enabled: false
           rate: cron(20 21 ? * 1-5 *)
-          input:
-            account: ${opt:account}
       - schedule:
           enabled: false
           rate: cron(20 4 ? * 6-7 *)
-          input:
-            account: ${opt:account}
   updateLikedMedia:
     handler: handler.updateLikedMedia
     events:
       - schedule:
           enabled: false
           rate: cron(18/16 0-1,22-23 ? * 1-5 *)
-          input:
-            account: ${opt:account}
       - schedule:
           enabled: false
           rate: cron(18/16 5-8 ? * 6-7 *)
-          input:
-            account: ${opt:account}
 
 plugins:
   - serverless-dynamodb-local
   - serverless-offline
   - serverless-webpack
+  - serverless-plugin-aws-alerts
 
 custom:
   webpackIncludeModules: true
@@ -104,3 +92,16 @@ custom:
       port: 8000
       migrate: true
       noStart: true
+  alerts:
+    stages:
+      - dev
+      - prod
+    topics:
+      alarm:
+        topic: ${self:service}-${opt:stage}-alerts-alarm
+        notifications:
+          - protocol: email
+            endpoint: instagrow@aaronromeo.com # Change this to your email address
+    alarms:
+      - functionErrors
+      - functionThrottles
