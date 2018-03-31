@@ -16,8 +16,8 @@ provider:
       - subnet-252a395e
       - subnet-722a3909
   environment:
-    ACCOUNT: ${file(./serverless.env.yml):${opt:stage}.ACCOUNT}
-    PASSWORD: ${file(./serverless.env.yml):${opt:stage}.PASSWORD}
+    # ACCOUNT: ${file(./serverless.env.yml):${opt:stage}.ACCOUNT}
+    # PASSWORD: ${file(./serverless.env.yml):${opt:stage}.PASSWORD}
     FOLLOWING_INTERACTION_DELTA_IN_DAYS: ${file(./serverless.env.yml):${opt:stage}.FOLLOWING_INTERACTION_DELTA_IN_DAYS}
     FOLLOWER_INTERACTION_DELTA_IN_DAYS: ${file(./serverless.env.yml):${opt:stage}.FOLLOWER_INTERACTION_DELTA_IN_DAYS}
   iamRoleStatements: # permissions for all of your functions can be set here
