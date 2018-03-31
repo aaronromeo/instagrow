@@ -6,7 +6,7 @@ provider:
   name: aws
   runtime: nodejs6.10
   profile: instagrow
-  timeout: 200
+  timeout: 250
   versionFunctions: false
   region: ca-central-1
   vpc:
