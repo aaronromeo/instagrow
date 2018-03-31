@@ -53,8 +53,16 @@ class DynamoDBService {
       },
     };
 
-    const data = await this.docClient.get(params).promise();
-    return (data.Item && data.Item.datavalue) || constants.settings.FOLLOWING_INTERACTION_DELTA_IN_DAYS;
+    try {
+      const data = await this.docClient.get(params).promise();
+      if (data.Item) {
+        return parseInt(data.Item.datavalue);
+      }
+    } catch(err) {
+      console.error(`Unable to get followingInteractionDeltaInDays ${err}`);
+      throw err;
+    }
+    return constants.settings.FOLLOWING_INTERACTION_DELTA_IN_DAYS;
   }
 
   async followerInteractionDeltaInDays(username) {
@@ -66,8 +74,16 @@ class DynamoDBService {
       },
     };
 
-    const data = await this.docClient.get(params).promise();
-    return (data.Item && data.Item.datavalue) || constants.settings.FOLLOWER_INTERACTION_DELTA_IN_DAYS;
+    try {
+      const data = await this.docClient.get(params).promise();
+      if (data.Item) {
+        return parseInt(data.Item.datavalue);
+      }
+    } catch(err) {
+      console.error(`Unable to get followerInteractionDeltaInDays ${err}`);
+      throw err;
+    }
+    return constants.settings.FOLLOWER_INTERACTION_DELTA_IN_DAYS;
   }
 
   getUserTableName(username) {
@@ -100,7 +116,7 @@ class DynamoDBService {
       console.log("Created table. Table description JSON:", JSON.stringify(data, null, 2));
       return new Promise.resolve(data);
     } catch(err) {
-      console.error("Unable to create table. Error JSON:", JSON.stringify(err, null, 2));
+      console.error("Unable to create table. Error JSON:", err);
       throw err;
     }
   }
@@ -143,7 +159,7 @@ class DynamoDBService {
       console.log("Created table. Table description JSON:", JSON.stringify(createTableData, null, 2));
       return new Promise.resolve(createTableData);
     } catch(err) {
-      console.error("Unable to create table. Error JSON:", JSON.stringify(err, null, 2));
+      console.error("Unable to create table. Error JSON:", err);
       throw err;
     };
   }
@@ -297,7 +313,7 @@ class DynamoDBService {
       console.log("Deleted table. Table description JSON:", JSON.stringify(data, null, 2));
       return data;
     } catch(err) {
-      console.error("Unable to delete table. Error JSON:", JSON.stringify(err, null, 2));
+      console.error("Unable to delete table. Error JSON:", err);
       throw err;
     };
   }
@@ -336,7 +352,7 @@ class DynamoDBService {
         await this.docClient.put(putParams).promise();
         console.log(`Imported ${record.username} (${record.instagramId})`);
       } catch(err) {
-        console.error(`Unable to add user ${record.username} (${record.instagramId}). Error JSON: ${JSON.stringify(err, null, 2)}`);
+        console.error(`Unable to add user ${record.username} (${record.instagramId}). Error JSON: ${err}`);
       }
     })
   }
@@ -353,7 +369,7 @@ class DynamoDBService {
       dataMarshal.exportData(`data/dump-${username}-dynamodb.json`);
       return data;
     } catch(err) {
-      console.error("Unable to describe table. Error JSON:", JSON.stringify(err, null, 2));
+      console.error("Unable to describe table. Error JSON:", err);
       throw err;
     }
   }
@@ -512,12 +528,14 @@ class DynamoDBService {
   };
 
   async getAccountsPossiblyRequiringInteraction(username) {
-    const followerInteractionAgeThreshold = this.followerInteractionDeltaInDays() && moment().subtract(this.followerInteractionDeltaInDays(), 'd');
+    const followerInteractionDeltaInDays = await this.followerInteractionDeltaInDays(username);
+    const followingInteractionDeltaInDays = await this.followingInteractionDeltaInDays(username);
+    const followerInteractionAgeThreshold = followerInteractionDeltaInDays && moment().subtract(followerInteractionDeltaInDays, 'd');
     const followingClause = "lastInteractionAt < :lifollowing AND isActive=:true AND isFollowing=:true";
     const followerClause = followerInteractionAgeThreshold ? "lastInteractionAt < :lifollower AND isActive=:true AND isFollower=:true" : "";
     const filterExpression = followerClause ? `(${followingClause}) OR (${followerClause})` : followingClause;
     const expressionAttributeValues = {
-      ":lifollowing": moment().subtract(this.followingInteractionDeltaInDays(), 'd').valueOf(),
+      ":lifollowing": moment().subtract(followingInteractionDeltaInDays, 'd').valueOf(),
       ":true": true,
     }
     if (followerInteractionAgeThreshold) {
@@ -529,19 +547,22 @@ class DynamoDBService {
       ExpressionAttributeValues: expressionAttributeValues,
     };
 
+    console.log(`params ${JSON.stringify(params)}`);
     try {
       const data = await this.docClient.scan(params).promise();
       return data.Items;
     } catch(err) {
-      console.error(`Unable to getAccountsPossiblyRequiringInteraction ${JSON.stringify(err)}`);
+      console.error(`Unable to getAccountsPossiblyRequiringInteraction ${err}`);
       throw err;
     }
   };
 
   async getAccountsToBeLiked(username) {
+    const followingInteractionDeltaInDays = await this.followingInteractionDeltaInDays(username);
+    const followerInteractionDeltaInDays = await this.followerInteractionDeltaInDays(username);
     const maximumAgeOfContentConsidered = moment().subtract(1, 'w');
-    const followingInteractionAgeThreshold = moment().subtract(this.followingInteractionDeltaInDays(), 'd');
-    const followerInteractionAgeThreshold = this.followerInteractionDeltaInDays() && moment().subtract(this.followerInteractionDeltaInDays(), 'd');
+    const followingInteractionAgeThreshold = moment().subtract(followingInteractionDeltaInDays, 'd');
+    const followerInteractionAgeThreshold = followerInteractionDeltaInDays && moment().subtract(followerInteractionDeltaInDays, 'd');
     const followingClause = "latestMediaCreatedAt > :lmca AND lastInteractionAt < latestMediaCreatedAt AND lastInteractionAt < :lifollowing AND isActive=:true AND isFollowing=:true";
     const followerClause = followerInteractionAgeThreshold ? "latestMediaCreatedAt > :lmca AND lastInteractionAt < latestMediaCreatedAt AND lastInteractionAt < :lifollower AND isActive=:true AND isFollower=:true" : "";
     const filterExpression = followerClause ? `(${followingClause}) OR (${followerClause})` : followingClause;
@@ -560,11 +581,13 @@ class DynamoDBService {
       ExpressionAttributeValues: expressionAttributeValues,
     };
 
+    console.log(`params ${JSON.stringify(params)}`);
+
     try {
       const data = await this.docClient.scan(params).promise();
       return data.Items;
     } catch(err) {
-      console.error(`Unable to getAccountsToBeLiked ${JSON.stringify(err)}`);
+      console.error(`Unable to getAccountsToBeLiked ${err}`);
       throw err;
     }
    };
@@ -737,7 +760,11 @@ class DynamoDBService {
         followingUsername,
       },
     };
-    await this.docClient.put(params).promise();
+    try {
+      await this.docClient.put(params).promise();
+    } catch(err) {
+      throw err;
+    }
     return {instagramId, mediaId};
   }
 

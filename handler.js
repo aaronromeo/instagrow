@@ -158,17 +158,20 @@ module.exports.getFollowingAndFollowers = async (event, context, callback) => {
 module.exports.updateInteractionActivity = async (event, context, callback) => {
   let response = {};
   try {
-    const {username} = await getSetupVars(event, callback);
-    const config = require(`./config.${username}.json`);
     const latestActivityOfFollowedAccounts = require("./src/getLatestActivityOfAccounts");
 
-    const updateInteractionActivityAsync = async () => {
-      return await latestActivityOfFollowedAccounts.getLatestActivityOfAccounts(config, constants.settings.DATABASE_OBJECT);
+    const updateInteractionActivityAsync = async ({username, password}) => {
+      return await latestActivityOfFollowedAccounts.getLatestActivityOfAccounts({username, password});
     }
 
     dynamoDBHandler.createInstance();
+    const username = await dynamoDBHandler.getInstance().getNextUserForFunction('updateInteractionActivity');
+    if (!username) throw new Error("No username defined for function 'updateInteractionActivity'");
 
-    const log = await updateInteractionActivityAsync();
+    const password = await dynamoDBHandler.getInstance().getPasswordForUser(username);
+    if (!password) throw new Error("No password defined for function 'updateInteractionActivity'");
+
+    const log = await updateInteractionActivityAsync({username, password});
     response = {
       statusCode: 200,
       body: JSON.stringify({
@@ -194,21 +197,27 @@ module.exports.updateInteractionActivity = async (event, context, callback) => {
 module.exports.addPendingLikeMediaToQueue = async (event, context, callback) => {
   let response = {};
   try {
-    const {username} = await getSetupVars(event, callback);
-    const config = require(`./config.${username}.json`);
-    const latestMediaOfFollowedAccounts = require("./src/getLatestMediaOfAccounts");
+    const latestMediaOfAccounts = require("./src/getLatestMediaOfAccounts");
     const pendingLikeMediaToQueue = require("./src/addPendingLikeMediaToQueue");
 
-    const addPendingLikeMediaToQueueAsync = async () => {
-      const log = await latestMediaOfFollowedAccounts.getLatestMediaOfAccounts(config, constants.settings.DATABASE_OBJECT);
-      log.concat(await pendingLikeMediaToQueue.addPendingLikeMediaToQueue(config, constants.settings.DATABASE_OBJECT));
+    const addPendingLikeMediaToQueueAsync = async ({username, password}) => {
+      console.log(`in addPendingLikeMediaToQueueAsync`);
+      const log = await latestMediaOfAccounts.getLatestMediaOfAccounts({username, password});
+      console.log(`current log ${JSON.stringify(log)}`);
+      log.concat(await pendingLikeMediaToQueue.addPendingLikeMediaToQueue({username, password}));
+      console.log(`current log x2 ${JSON.stringify(log)}`);
 
       return log;
     }
 
     dynamoDBHandler.createInstance();
+    const username = await dynamoDBHandler.getInstance().getNextUserForFunction('addPendingLikeMediaToQueue');
+    if (!username) throw new Error("No username defined for function 'addPendingLikeMediaToQueue'");
 
-    const log = await addPendingLikeMediaToQueueAsync();
+    const password = await dynamoDBHandler.getInstance().getPasswordForUser(username);
+    if (!password) throw new Error("No password defined for function 'addPendingLikeMediaToQueue'");
+
+    const log = await addPendingLikeMediaToQueueAsync({username, password});
     response = {
       statusCode: 200,
       body: JSON.stringify({
