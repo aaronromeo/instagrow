@@ -14,9 +14,9 @@ exports.getAccountFollowers = async ({username, password}) => {
   const badAccounts = accountRows.filter(account => !account);
   if (!badAccounts.length) {
     console.log(`List of Accounts followers successfully saved for ${accountRows.length} accounts`);
-    return Promise.resolve(accountRows.length);
+    return accountRows.length;
   } else {
     console.error(`Error saving accounts ${badAccounts}`);
-    return Promise.reject(`Error saving accounts ${badAccounts}`);
+    throw new Error(`Error saving accounts ${badAccounts}`);
   }
 }

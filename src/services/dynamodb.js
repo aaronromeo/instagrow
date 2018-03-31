@@ -430,18 +430,18 @@ class DynamoDBService {
   }
 
   async getNextUserForFunction(funcName) {
-    const usernames = await this.getUsers();
-    const usernameObject = usernames.reduce((accumulator, username) => {
-      accumulator[`:${username}`] = username;
-      return accumulator;
-    }, {});
-    const params = {
-      TableName: "Instagrow-Config",
-      FilterExpression : `datatype = :functionName AND username IN (${Object.keys(usernameObject).toString()})`,
-      ExpressionAttributeValues : Object.assign({}, usernameObject, {":functionName": `${funcName}Timestamp`}),
-    };
-
     try {
+      const usernames = await this.getUsers();
+      const usernameObject = usernames.reduce((accumulator, username) => {
+        accumulator[`:${username}`] = username;
+        return accumulator;
+      }, {});
+      const params = {
+        TableName: "Instagrow-Config",
+        FilterExpression : `datatype = :functionName AND username IN (${Object.keys(usernameObject).toString()})`,
+        ExpressionAttributeValues : Object.assign({}, usernameObject, {":functionName": `${funcName}Timestamp`}),
+      };
+
       const data = await this.docClient.scan(params).promise()
       const usernameMap = usernames.reduce((accumulator, username) => {
         const psuedoItem = data.Items.find(item => item.username === username) || {datavalue: 0};
