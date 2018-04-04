@@ -1,15 +1,13 @@
 const Client = require('instagram-private-api').V1;
 const Promise = require('bluebird');
 const _ = require('lodash');
+const dynamoDBHandler = require("./services/dynamodb").handler;
 const moment = require('moment');
 
 const sessionSingleton = require("./services/sessionSingleton");
 
-exports.addPendingLikeMediaToQueue = async (config, db) => {
-  const [session, accountsRelated] = await Promise.all([
-    sessionSingleton.session.createSession(config),
-    db.handler.getInstance().getAccountsToBeLiked(),
-  ]);
+module.exports = async ({username}) => {
+  const accountsRelated = await dynamoDBHandler.getInstance().getAccountsToBeLiked(username);
 
   const log = [];
   if (accountsRelated.length) {
@@ -22,14 +20,14 @@ exports.addPendingLikeMediaToQueue = async (config, db) => {
     });
   }
   console.log();
-  await Promise.mapSeries(_.shuffle(accountsRelated), accountToBeInteractedWith => {
-    return db.handler.getInstance().addLatestMediaToPendingTable(
-      accountToBeInteractedWith.instagramId,
-      accountToBeInteractedWith.latestMediaId,
-      accountToBeInteractedWith.latestMediaUrl,
-      accountToBeInteractedWith.username,
-    )
+  const chunkedShuffledMediaBlocks = _.chunk(_.shuffle(accountsRelated), 10);
+  await Promise.mapSeries(chunkedShuffledMediaBlocks, async (chunkedShuffledMediaBlock) => {
+    console.log(`Adding block for ${JSON.stringify(chunkedShuffledMediaBlock)}`);
+    return await dynamoDBHandler.getInstance().addLatestMediaBlockToPendingTable(
+      username,
+      chunkedShuffledMediaBlock,
+    );
   });
 
-  return Promise.resolve(log);
+  return log;
 }

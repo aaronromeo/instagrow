@@ -114,7 +114,7 @@ class DynamoDBService {
     try {
       const data = await createTable(CREATE_TABLE_SCRIPT).promise();
       console.log("Created table. Table description JSON:", JSON.stringify(data, null, 2));
-      return new Promise.resolve(data);
+      return data;
     } catch(err) {
       console.error("Unable to create table. Error JSON:", err);
       throw err;
@@ -131,24 +131,22 @@ class DynamoDBService {
         { AttributeName: "instagramId", AttributeType: "S" }
       ],
       ProvisionedThroughput: {
-        ReadCapacityUnits: 1,
-        WriteCapacityUnits: 1
+        ReadCapacityUnits: 2,
+        WriteCapacityUnits: 2
       }
     };
 
     const CREATE_PENDING_MEDIA_TABLE_SCRIPT = {
       TableName : this.getPendingMediaTableName(username),
       KeySchema: [
-        { AttributeName: "mediaId", KeyType: "HASH"},
-        { AttributeName: "instagramId", KeyType: "RANGE"}
+        { AttributeName: "id", KeyType: "HASH"}
       ],
       AttributeDefinitions: [
-        { AttributeName: "mediaId", AttributeType: "S" },
-        { AttributeName: "instagramId", AttributeType: "S" }
+        { AttributeName: "id", AttributeType: "N" }
       ],
       ProvisionedThroughput: {
-        ReadCapacityUnits: 1,
-        WriteCapacityUnits: 1
+        ReadCapacityUnits: 2,
+        WriteCapacityUnits: 2
       }
     };
 
@@ -157,7 +155,7 @@ class DynamoDBService {
       console.log("Created table. Table description JSON:", JSON.stringify(data, null, 2));
       const createTableData = await this.db.createTable(CREATE_PENDING_MEDIA_TABLE_SCRIPT).promise()
       console.log("Created table. Table description JSON:", JSON.stringify(createTableData, null, 2));
-      return new Promise.resolve(createTableData);
+      return new createTableData;
     } catch(err) {
       console.error("Unable to create table. Error JSON:", err);
       throw err;
@@ -172,8 +170,8 @@ class DynamoDBService {
   async createTableScalingPolicy(tableName) {
     const data = [];
     const paramsWrites = {
-      MaxCapacity: 10,
-      MinCapacity: 1,
+      MaxCapacity: 15,
+      MinCapacity: 2,
       ResourceId: `table/${tableName}`,
       ScalableDimension: "dynamodb:table:WriteCapacityUnits",
       ServiceNamespace: "dynamodb"
@@ -185,17 +183,17 @@ class DynamoDBService {
       PolicyName: `${tableName}-write-scaling-policy`,
       PolicyType: "TargetTrackingScaling",
       TargetTrackingScalingPolicyConfiguration: {
-        ScaleOutCooldown: 30,
+        ScaleOutCooldown: 1,
         ScaleInCooldown: 30,
-        TargetValue: 80.0,
+        TargetValue: 60.0,
         PredefinedMetricSpecification: {
           PredefinedMetricType: "DynamoDBWriteCapacityUtilization"
         }
       }
     };
     const paramsReads = {
-      MaxCapacity: 10,
-      MinCapacity: 1,
+      MaxCapacity: 15,
+      MinCapacity: 2,
       ResourceId: `table/${tableName}`,
       ScalableDimension: "dynamodb:table:ReadCapacityUnits",
       ServiceNamespace: "dynamodb"
@@ -207,9 +205,9 @@ class DynamoDBService {
       PolicyName: `${tableName}-read-scaling-policy`,
       PolicyType: "TargetTrackingScaling",
       TargetTrackingScalingPolicyConfiguration: {
-        ScaleOutCooldown: 30,
+        ScaleOutCooldown: 1,
         ScaleInCooldown: 30,
-        TargetValue: 80.0,
+        TargetValue: 60.0,
         PredefinedMetricSpecification: {
           PredefinedMetricType: "DynamoDBReadCapacityUtilization"
         }
@@ -237,7 +235,6 @@ class DynamoDBService {
 
     try {
       const data = await this.docClient.put(params).promise()
-      console.log(data);
       return data;
     } catch(err) {
       console.error(err);
@@ -257,7 +254,6 @@ class DynamoDBService {
 
     try {
       const data = await this.docClient.put(params).promise()
-      console.log(data);
       return data;
     } catch(err) {
       console.error(err);
@@ -277,7 +273,6 @@ class DynamoDBService {
 
     try {
       const data = await this.docClient.put(params).promise()
-      console.log(data);
       return data;
     } catch(err) {
       console.error(err);
@@ -297,7 +292,6 @@ class DynamoDBService {
 
     try {
       const data = await this.docClient.put(params).promise()
-      console.log(data);
       return data;
     } catch(err) {
       console.error(err);
@@ -342,7 +336,7 @@ class DynamoDBService {
     const dataMarshal = new dataMarshalService.service.DataMarshal();
     dataMarshal.importData(`data/dump-${username}-dynamodb.json`);
 
-    await Promise.map(dataMarshal.records, async (record) => {
+    await Promise.mapSeries(dataMarshal.records, async (record) => {
       const putParams = {
         TableName: this.getUserTableName(username),
         Item: record,
@@ -438,6 +432,9 @@ class DynamoDBService {
     try {
       const data = await this.docClient.scan(params).promise();
       const usernames = data.Items.map((item) => item.username)
+      if (!usernames.length) {
+        throw new Error("No usernames are enabled");
+      }
       return usernames;
     } catch(err) {
       console.error(err);
@@ -470,7 +467,7 @@ class DynamoDBService {
       }, {username: null, max: moment().valueOf()});
       return usernameMap.username;
     } catch(err) {
-      console.error(`Unable to get the function #{err}`);
+      console.error(`Unable to get the function ${err}`);
       throw err;
     }
   }
@@ -488,6 +485,44 @@ class DynamoDBService {
     const data = await this.docClient.put(params).promise()
     return data;
   }
+
+  async getFollowing(username) {
+    const params = {
+      TableName: this.getUserTableName(username),
+      FilterExpression:
+        "isFollower=:true AND isActive=:true",
+      ExpressionAttributeValues: {
+        ":true": true,
+      }
+    };
+
+    try {
+      const data = await this.docClient.scan(params).promise();
+      return data.Items;
+    } catch(err) {
+      console.error(`Unable to fetch cached following accounts from user ${username}`);
+      throw err;
+    }
+  };
+
+  async getFollowers(username) {
+    const params = {
+      TableName: this.getUserTableName(username),
+      FilterExpression:
+        "isFollower=:true AND isActive=:true",
+      ExpressionAttributeValues: {
+        ":true": true,
+      }
+    };
+
+    try {
+      const data = await this.docClient.scan(params).promise();
+      return data.Items;
+    } catch(err) {
+      console.error(`Unable to fetch cached follower accounts from user ${username}`);
+      throw err;
+    }
+  };
 
   async getMediaWithLastInteraction(username) {
     const params = {
@@ -547,7 +582,6 @@ class DynamoDBService {
       ExpressionAttributeValues: expressionAttributeValues,
     };
 
-    console.log(`params ${JSON.stringify(params)}`);
     try {
       const data = await this.docClient.scan(params).promise();
       return data.Items;
@@ -581,8 +615,6 @@ class DynamoDBService {
       ExpressionAttributeValues: expressionAttributeValues,
     };
 
-    console.log(`params ${JSON.stringify(params)}`);
-
     try {
       const data = await this.docClient.scan(params).promise();
       return data.Items;
@@ -592,44 +624,44 @@ class DynamoDBService {
     }
    };
 
-  async updateFollowerAccountsToInactive(username) {
-    const tableName = this.getUserTableName(username);
-    const scanParams = {
-      TableName: tableName,
-      FilterExpression: "isFollower=:true",
-      ExpressionAttributeValues: {
-        ":true": true,
-      }
-    };
+  // async updateFollowerAccountsToInactive(username) {
+  //   const tableName = this.getUserTableName(username);
+  //   const scanParams = {
+  //     TableName: tableName,
+  //     FilterExpression: "isFollower=:true",
+  //     ExpressionAttributeValues: {
+  //       ":true": true,
+  //     }
+  //   };
 
-    const updateParams = (username, instagramId) => ({
-      TableName: tableName,
-      Key: {instagramId: instagramId},
-      UpdateExpression: "set isActive = :false, isFollower = :false",
-      ExpressionAttributeValues:{
-        ":false": false,
-      },
-      ReturnValues:"UPDATED_NEW",
-    });
+  //   const updateParams = (username, instagramId) => ({
+  //     TableName: tableName,
+  //     Key: {instagramId: instagramId},
+  //     UpdateExpression: "set isActive = :false, isFollower = :false",
+  //     ExpressionAttributeValues:{
+  //       ":false": false,
+  //     },
+  //     ReturnValues:"UPDATED_NEW",
+  //   });
 
-    try {
-      const data = await this.docClient.scan(scanParams).promise();
-      if (!data.Items) return;
-      const output = await Promise.map(data.Items, async (account) => {
-        const nextParams = updateParams(username, account.instagramId.toString());
-        try {
-          return await this.docClient.update(nextParams).promise();
-        } catch(err) {
-          console.error(`Error updating ${JSON.stringify(nextParams)}`);
-          throw err;
-        }
-      });
-      return output;
-    } catch(err) {
-      console.error(`Unable to updateFollowerAccountsToInactive for ${username}`);
-      throw err;
-    }
-  }
+  //   try {
+  //     const data = await this.docClient.scan(scanParams).promise();
+  //     if (!data.Items) return;
+  //     const output = await Promise.mapSeries(data.Items, async (account) => {
+  //       const nextParams = updateParams(username, account.instagramId.toString());
+  //       try {
+  //         return await this.docClient.update(nextParams).promise();
+  //       } catch(err) {
+  //         console.error(`Error updating ${JSON.stringify(nextParams)}`);
+  //         throw err;
+  //       }
+  //     });
+  //     return output;
+  //   } catch(err) {
+  //     console.error(`Unable to updateFollowerAccountsToInactive for ${username}`);
+  //     throw err;
+  //   }
+  // }
 
   async updateFollowingAccountsToInactive(username) {
     const tableName = this.getUserTableName(username);
@@ -654,7 +686,7 @@ class DynamoDBService {
     try {
       const data = await this.docClient.scan(scanParams).promise();
       if (!data.Items) return;
-      const output = await Promise.map(data.Items, async (account) => {
+      const output = await Promise.mapSeries(data.Items, async (account) => {
         const nextParams = updateParams(username, account.instagramId.toString());
         try {
           return await this.docClient.update(updateParams(username, account.instagramId.toString())).promise()
@@ -672,14 +704,14 @@ class DynamoDBService {
 
   async addFollowersAccountOrUpdateUsernameBatch(username, followersResults) {
     const tableName = this.getUserTableName(username);
-    const data = await Promise.map(followersResults, async (user) =>{
+    const data = await Promise.mapSeries(followersResults, async (user) =>{
       return await this.addFollowersAccountOrUpdateUsername(username, user.id, user._params.username)
     });
 
     return data;
   }
 
-  async addFollowersAccountOrUpdateUsername(username, instagramId, followerUsername) {
+  async addFollowersAccountOrUpdateUsername(username, instagramId, followerUsername, isActive=true) {
     const account = await this.getAccountByInstagramId(username, instagramId);
     const tableName = this.getUserTableName(username);
     try {
@@ -687,10 +719,11 @@ class DynamoDBService {
         const params = {
           TableName: tableName,
           Key: {instagramId: instagramId.toString()},
-          UpdateExpression: "set username = :u, isFollower = :true, isActive = :true",
+          UpdateExpression: "set username = :u, isFollower = :true, isActive = :isActive",
           ExpressionAttributeValues:{
             ":u": followerUsername,
             ":true": true,
+            ":isActive": isActive,
           },
           ReturnValues:"UPDATED_NEW"
         };
@@ -713,7 +746,7 @@ class DynamoDBService {
 
   async addFollowingAccountOrUpdateUsernameBatch(username, followingResults) {
     const tableName = this.getUserTableName(username);
-    const data = await Promise.map(followingResults, async (user) =>{
+    const data = await Promise.mapSeries(followingResults, async (user) =>{
       return await this.addFollowingAccountOrUpdateUsername(username, user.id, user._params.username);
     });
     return data;
@@ -750,25 +783,32 @@ class DynamoDBService {
     }
   }
 
-  async addLatestMediaToPendingTable(username, instagramId, mediaId, mediaUrl, followingUsername) {
+  async addLatestMediaBlockToPendingTable(username, chunkedShuffledMediaBlock) {
+    const subItems = chunkedShuffledMediaBlock.map(item => {
+      return {
+        instagramId: item.instagramId,
+        mediaId: item.latestMediaId,
+        mediaUrl: item.latestMediaUrl,
+        followerFollowingUsername: item.username,
+      }
+    });
     const params = {
       TableName: this.getPendingMediaTableName(username),
       Item: {
-        instagramId: instagramId.toString(),
-        mediaId,
-        mediaUrl,
-        followingUsername,
+        id: moment().valueOf(),
+        block: subItems,
       },
     };
     try {
       await this.docClient.put(params).promise();
     } catch(err) {
+      console.error(`Error in addLatestMediaBlockToPendingTable ${err}`);
       throw err;
     }
-    return {instagramId, mediaId};
+    return {count: subItems.length};
   }
 
-  async getLatestMediaFromPendingTable(username, limit=null) {
+  async getLatestMediaBlockFromPendingTable(username, limit=null) {
     const params = {
       TableName: this.getPendingMediaTableName(username),
     };
@@ -779,12 +819,11 @@ class DynamoDBService {
     return data.Items;
   }
 
-  async deleteMediaFromPendingTable(username, instagramId, mediaId) {
+  async deleteMediaBlockFromPendingTable(username, blockId) {
     const params = {
       TableName: this.getPendingMediaTableName(username),
       Key: {
-        instagramId,
-        mediaId,
+        id: blockId,
       }
     };
     const data = await this.docClient.delete(params).promise();
@@ -803,7 +842,11 @@ class DynamoDBService {
       },
       ReturnValues:"UPDATED_NEW"
     };
-    await this.docClient.update(params).promise();
+    try {
+      await this.docClient.update(params).promise();
+    } catch(err) {
+      console.error(`Error thrown in updateLatestMediaDetails ${err}`);
+    }
     return {instagramId: instagramId};
   }
 
@@ -817,7 +860,11 @@ class DynamoDBService {
       },
       ReturnValues:"UPDATED_NEW"
     };
-    await this.docClient.update(params).promise();
+    try {
+      await this.docClient.update(params).promise();
+    } catch(err) {
+      console.error(`Error thrown in updateLastInteration ${err}`);
+    }
     return {instagramId: instagramId};
   }
 }
