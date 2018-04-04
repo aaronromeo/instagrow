@@ -1,6 +1,4 @@
 const tough = require('tough-cookie');
-const Promise = require('bluebird');
-
 const Store = tough.Store;
 const permuteDomain = tough.permuteDomain;
 const permutePath = tough.permutePath;

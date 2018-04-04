@@ -1,5 +1,4 @@
 const Client = require('instagram-private-api').V1;
-const Promise = require('bluebird');
 const fs = require('fs');
 const dynamodb = require('./dynamodb');
 const DynamoDBCookieStore = require('./DynamoDBCookieStore');
