@@ -490,7 +490,7 @@ class DynamoDBService {
     const params = {
       TableName: this.getUserTableName(username),
       FilterExpression:
-        "isFollower=:true AND isActive=:true",
+        "isFollowing=:true AND isActive=:true",
       ExpressionAttributeValues: {
         ":true": true,
       }
@@ -624,93 +624,6 @@ class DynamoDBService {
     }
    };
 
-  // async updateFollowerAccountsToInactive(username) {
-  //   const tableName = this.getUserTableName(username);
-  //   const scanParams = {
-  //     TableName: tableName,
-  //     FilterExpression: "isFollower=:true",
-  //     ExpressionAttributeValues: {
-  //       ":true": true,
-  //     }
-  //   };
-
-  //   const updateParams = (username, instagramId) => ({
-  //     TableName: tableName,
-  //     Key: {instagramId: instagramId},
-  //     UpdateExpression: "set isActive = :false, isFollower = :false",
-  //     ExpressionAttributeValues:{
-  //       ":false": false,
-  //     },
-  //     ReturnValues:"UPDATED_NEW",
-  //   });
-
-  //   try {
-  //     const data = await this.docClient.scan(scanParams).promise();
-  //     if (!data.Items) return;
-  //     const output = await Promise.mapSeries(data.Items, async (account) => {
-  //       const nextParams = updateParams(username, account.instagramId.toString());
-  //       try {
-  //         return await this.docClient.update(nextParams).promise();
-  //       } catch(err) {
-  //         console.error(`Error updating ${JSON.stringify(nextParams)}`);
-  //         throw err;
-  //       }
-  //     });
-  //     return output;
-  //   } catch(err) {
-  //     console.error(`Unable to updateFollowerAccountsToInactive for ${username}`);
-  //     throw err;
-  //   }
-  // }
-
-  async updateFollowingAccountsToInactive(username) {
-    const tableName = this.getUserTableName(username);
-    const scanParams = {
-      TableName: tableName,
-      FilterExpression: "isFollowing=:true",
-      ExpressionAttributeValues: {
-        ":true": true,
-      }
-    };
-
-    const updateParams = (username, instagramId) => ({
-      TableName: tableName,
-      Key: {instagramId: instagramId},
-      UpdateExpression: "set isActive = :false, isFollowing = :false",
-      ExpressionAttributeValues:{
-        ":false": false,
-      },
-      ReturnValues:"UPDATED_NEW",
-    });
-
-    try {
-      const data = await this.docClient.scan(scanParams).promise();
-      if (!data.Items) return;
-      const output = await Promise.mapSeries(data.Items, async (account) => {
-        const nextParams = updateParams(username, account.instagramId.toString());
-        try {
-          return await this.docClient.update(updateParams(username, account.instagramId.toString())).promise()
-        } catch(err) {
-          console.error(`Error updating ${JSON.stringify(nextParams)}`);
-          throw err;
-        }
-      });
-      return output;
-    } catch(err) {
-      console.error(`Unable to updateFollowingAccountsToInactive for ${username}`);
-      throw err;
-    }
-  }
-
-  async addFollowersAccountOrUpdateUsernameBatch(username, followersResults) {
-    const tableName = this.getUserTableName(username);
-    const data = await Promise.mapSeries(followersResults, async (user) =>{
-      return await this.addFollowersAccountOrUpdateUsername(username, user.id, user._params.username)
-    });
-
-    return data;
-  }
-
   async addFollowersAccountOrUpdateUsername(username, instagramId, followerUsername, isActive=true) {
     const account = await this.getAccountByInstagramId(username, instagramId);
     const tableName = this.getUserTableName(username);
@@ -744,15 +657,7 @@ class DynamoDBService {
   }
 
 
-  async addFollowingAccountOrUpdateUsernameBatch(username, followingResults) {
-    const tableName = this.getUserTableName(username);
-    const data = await Promise.mapSeries(followingResults, async (user) =>{
-      return await this.addFollowingAccountOrUpdateUsername(username, user.id, user._params.username);
-    });
-    return data;
-  }
-
-  async addFollowingAccountOrUpdateUsername(username, instagramId, followingUsername) {
+  async addFollowingAccountOrUpdateUsername(username, instagramId, followingUsername, isActive=true) {
     const account = await this.getAccountByInstagramId(username, instagramId);
     const tableName = this.getUserTableName(username);
     try {
@@ -760,10 +665,11 @@ class DynamoDBService {
         const params = {
           TableName: tableName,
           Key: {instagramId: instagramId.toString()},
-          UpdateExpression: "set username = :u, isFollowing = :true, isActive = :true",
+          UpdateExpression: "set username = :u, isFollowing = :true, isActive = :isActive",
           ExpressionAttributeValues:{
             ":u": followingUsername,
             ":true": true,
+            ":isActive": isActive,
           },
           ReturnValues:"UPDATED_NEW"
         };
