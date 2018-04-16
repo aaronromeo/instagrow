@@ -69,26 +69,14 @@ functions:
     handler: handler.queuePendingLikeMedia
     events:
       - schedule:
-          enabled: false
-          rate: cron(50 0-4 ? * * *)
-      - schedule:
-          enabled: false
-          rate: cron(50 11-13 ? * 1-5 *)
-      - schedule:
-          enabled: false
-          rate: cron(50 13-16 ? * 6-7 *)
+          enabled: true
+          rate: cron(0,20,40 12-4 ? * * *)
   updateLikedMedia:
     handler: handler.updateLikedMedia
     events:
       - schedule:
-          enabled: false
-          rate: cron(*/10 1-5 ? * * *)
-      - schedule:
-          enabled: false
-          rate: cron(*/10 12-14 ? * 1-5 *)
-      - schedule:
-          enabled: false
-          rate: cron(*/10 14-17 ? * 6-7 *)
+          enabled: true
+          rate: cron(*/5 12-6 ? * * *)
 
 plugins:
   - serverless-dynamodb-local
