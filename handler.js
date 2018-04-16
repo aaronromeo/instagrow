@@ -233,31 +233,21 @@ module.exports.updateInteractionActivity = async (event, context, callback) => {
   }
 };
 
-module.exports.queuePendingLikeMedia = async (event, context, callback) => {
+module.exports.getLatestMediaOfAccounts = async (event, context, callback) => {
   let response = {};
   const addPendingLikeMediaToQueueAsync = async ({username, password}) => {
-    console.log(`Point 4`);
-    const log = await getLatestMediaOfAccounts({username, password});
-    console.log(`Point 5`);
-    log.concat(await addPendingLikeMediaToQueue({username}));
-
-    return log;
+    return await getLatestMediaOfAccounts({username, password});
   }
 
   try {
-
-    console.log(`Point 1`);
     dynamoDBHandler.createInstance();
-    console.log(`Point 2`);
-    const username = await dynamoDBHandler.getInstance().getNextUserForFunction('queuePendingLikeMedia');
-    if (!username) throw new Error("No username defined for function 'queuePendingLikeMedia'");
+    const username = await dynamoDBHandler.getInstance().getNextUserForFunction('getLatestMediaOfAccounts');
+    if (!username) throw new Error("No username defined for function 'getLatestMediaOfAccounts'");
 
     const password = await dynamoDBHandler.getInstance().getPasswordForUser(username);
-    if (!password) throw new Error("No password defined for function 'addPendingLikeMediaToQueue'");
+    if (!password) throw new Error("No password defined for function 'getLatestMediaOfAccounts'");
 
-    console.log(`Point 3`);
     const log = await addPendingLikeMediaToQueueAsync({username, password});
-    console.log(`Point 6`);
     response = {
       statusCode: 200,
       body: JSON.stringify({
@@ -280,23 +270,41 @@ module.exports.queuePendingLikeMedia = async (event, context, callback) => {
   }
 };
 
-module.exports.namedFunctionExection = async (event, context, callback) => {
-  // const username = process.env.ACCOUNT;
-  // const functionName = process.env.FUNCTION;
-  // if (!username) throw new Error("No username defined for function 'namedFunctionExection'");
-  // if (!functionName) throw new Error("No functionName defined for function 'namedFunctionExection'");
+module.exports.queuePendingLikeMedia = async (event, context, callback) => {
+  let response = {};
+  const addPendingLikeMediaToQueueAsync = async ({username, password}) => {
+    return await addPendingLikeMediaToQueue({username});
+  }
 
-  // dynamoDBHandler.createInstance();
-  // const password = await dynamoDBHandler.getInstance().getPasswordForUser(username);
-  // if (!password) throw new Error("No password defined for function 'namedFunctionExection'");
+  try {
+    dynamoDBHandler.createInstance();
+    const username = await dynamoDBHandler.getInstance().getNextUserForFunction('queuePendingLikeMedia');
+    if (!username) throw new Error("No username defined for function 'queuePendingLikeMedia'");
 
-  // switch (functionName) {
-  //   case 'addLatestMediaToPendingTable':
-  //     dynamoDBHandler.getInstance().addLatestMediaToPendingTable()
-  //     break;
-  //   default:
-  //     throw new Error(`Unknown function ${functionName}`);
-  // }
+    const password = await dynamoDBHandler.getInstance().getPasswordForUser(username);
+    if (!password) throw new Error("No password defined for function 'queuePendingLikeMedia'");
+
+    const log = await addPendingLikeMediaToQueueAsync({username, password});
+    response = {
+      statusCode: 200,
+      body: JSON.stringify({
+        message: `Successful run`,
+        data: {
+          log: log,
+        }
+      })
+    };
+  } catch(err) {
+    console.error(`Error ${err}`);
+    response = {
+      statusCode: 400,
+      body: JSON.stringify({
+        message: err,
+      }),
+    };
+  } finally {
+    callback(null, response);
+  }
 };
 
 module.exports.updateLikedMedia = async (event, context, callback) => {
