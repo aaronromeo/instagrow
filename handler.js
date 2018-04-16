@@ -7,7 +7,7 @@ const addPendingLikeMediaToQueue = require("./src/addPendingLikeMediaToQueue");
 const getAccountFollowers = require("./src/getAccountFollowers");
 const getAccountsFollowing = require("./src/getAccountsFollowing");
 const getLatestActivityOfAccounts = require("./src/getLatestActivityOfAccounts");
-const likedMedia = require("./src/updateLikedMedia");
+const updateLikedMedia = require("./src/updateLikedMedia");
 
 const getSetupVars = async (event) => {
   const username = event["account"] || process.env.ACCOUNT;
@@ -311,7 +311,7 @@ module.exports.updateLikedMedia = async (event, context, callback) => {
   let response = {};
   try {
     const updateLikedMediaAsync = async ({username, password}) => {
-      return await likedMedia.updateLikedMedia({username, password});
+      return await updateLikedMedia({username, password});
     }
 
     dynamoDBHandler.createInstance();
