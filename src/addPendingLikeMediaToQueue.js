@@ -20,13 +20,14 @@ module.exports = async ({username}) => {
     });
   }
   console.log();
-  const chunkedShuffledMediaBlocks = _.chunk(_.shuffle(accountsRelated), 10);
-  await Promise.mapSeries(chunkedShuffledMediaBlocks, async (chunkedShuffledMediaBlock) => {
-    console.log(`Adding block for ${JSON.stringify(chunkedShuffledMediaBlock)}`);
-    return await dynamoDBHandler.getInstance().addLatestMediaBlockToPendingTable(
+  await Promise.mapSeries(_.shuffle(accountsRelated), accountToBeInteractedWith => {
+    return dynamoDBHandler.getInstance().addLatestMediaToPendingTable(
       username,
-      chunkedShuffledMediaBlock,
-    );
+      accountToBeInteractedWith.instagramId,
+      accountToBeInteractedWith.latestMediaId,
+      accountToBeInteractedWith.latestMediaUrl,
+      accountToBeInteractedWith.username,
+    )
   });
 
   return log;

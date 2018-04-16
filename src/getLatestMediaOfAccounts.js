@@ -5,6 +5,11 @@ const Promise = require('bluebird');
 
 const sessionSingleton = require("./services/sessionSingleton");
 
+const getLastLikedMediaTimestamp = (medias) => {
+  const likedMedia = medias.filter(media => media._params.hasLiked) || {};
+  return likedMedia.length ? likedMedia[0]._params.takenAt : 0;
+}
+
 module.exports = async ({username, password}) => {
   const [session, accountsRelated] = await Promise.all([
     sessionSingleton.session.createSession({username, password}),
@@ -12,48 +17,50 @@ module.exports = async ({username, password}) => {
   ]);
   const log = [];
 
-  const accountsRelatedUserMedia = accountsRelated.map((accountFollowing) => {
-    return new Client.Feed.UserMedia(session, accountFollowing.instagramId, 1);
-  })
-
-  let usersMedia = await Promise.mapSeries(accountsRelatedUserMedia, async latestUserMedia => {
+  let usersMedia = await Promise.mapSeries(_.slice(accountsRelated, 0, 20), async account => {
     try {
-      return await latestUserMedia.get();
+      const userMedia = new Client.Feed.UserMedia(session, account.instagramId, 1);
+      const medias = await userMedia.get();
+      if (!medias.length === 0 || !medias[0] || !medias[0]._params) {
+        await dynamoDBHandler.getInstance().updateLatestMediaDetails(
+          username,
+          account.instagramId,
+          null,
+          null,
+          0,
+        )
+      } else {
+        const lastLikedMediaTimestamp = getLastLikedMediaTimestamp(medias);
+        if (lastLikedMediaTimestamp && (!account.lastInteractionAt || account.lastInteractionAt < lastLikedMediaTimestamp)) {
+          await Promise.all([
+            dynamoDBHandler.getInstance().updateLatestMediaDetails(
+              username,
+              medias[0]._params.user.pk,
+              medias[0]._params.id,
+              medias[0]._params.webLink,
+              medias[0]._params.takenAt,
+            ),
+            dynamoDBHandler.getInstance().updateLastInteration(
+              username,
+              account.instagramId,
+              lastLikedMediaTimestamp,
+            ),
+          ]);
+        } else {
+          await dynamoDBHandler.getInstance().updateLatestMediaDetails(
+            username,
+            medias[0]._params.user.pk,
+            medias[0]._params.id,
+            medias[0]._params.webLink,
+            medias[0]._params.takenAt,
+          )
+        }
+      }
     } catch(e) {
-      log.push(`${e.message} trying to retrieve ${latestUserMedia.accountId}`);
-      console.log(`${e.message} trying to retrieve ${latestUserMedia.accountId}`);
-      return null;
+      log.push(`${e.message} trying to retrieve ${account.instagramId}`);
+      console.log(`${e.message} trying to retrieve ${account.instagramId}`);
     };
-  });
-
-  usersMedia = await Promise.mapSeries(_.compact(usersMedia), async medias => {
-    if (!medias.length === 0 || !medias[0] || !medias[0]._params) {
-      return null;
-    };
-    if (medias[0]._params.hasLiked) {
-      return await Promise.all([
-        dynamoDBHandler.getInstance().updateLatestMediaDetails(
-          username,
-          medias[0]._params.user.pk,
-          medias[0]._params.id,
-          medias[0]._params.webLink,
-          medias[0]._params.takenAt,
-        ),
-        dynamoDBHandler.getInstance().updateLastInteration(
-          username,
-          medias[0]._params.user.pk,
-          medias[0]._params.takenAt,
-        ),
-      ]);
-    } else {
-      return await dynamoDBHandler.getInstance().updateLatestMediaDetails(
-        username,
-        medias[0]._params.user.pk,
-        medias[0]._params.id,
-        medias[0]._params.webLink,
-        medias[0]._params.takenAt,
-      )
-    }
+    return account.instagramId
   });
 
   log.push(`Account media followed successfully saved for ${usersMedia.length} accounts!`);
