@@ -7,7 +7,7 @@ const moment = require('moment');
 const sessionSingleton = require("./services/sessionSingleton");
 
 module.exports = async ({username}) => {
-  const accountsRelated = await dynamoDBHandler.getInstance().getAccountsToBeLiked(username);
+  const accountsRelated = await dynamoDBHandler.getInstance().getAccountsToBeLiked(username, 20);
 
   const log = [];
   if (accountsRelated.length) {
