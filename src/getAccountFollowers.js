@@ -1,25 +1,29 @@
 const Client = require('instagram-private-api').V1;
-const Promise = require('bluebird');
-
+const dynamoDBHandler = require("./services/dynamodb").handler;
 const sessionSingleton = require("./services/sessionSingleton");
+const compareCachedToFetched = require("./utils/compareCachedToFetched");
 
-exports.getAccountFollowers = async (config, db) => {
-  await db.handler.getInstance().updateFollowerAccountsToInactive();
-  const session = await sessionSingleton.session.createSession(config);
-  const accountId = await session.getAccountId();
-  const feed = await new Client.Feed.AccountFollowers(session, accountId);
-  const followersResults = await feed.get();
-
-  const accountRows = await Promise.map(
-      followersResults,
-      user => db.handler.getInstance().addFollowersAccountOrUpdateUsername(user.id, user._params.username)
-    );
-  const badAccounts = accountRows.filter(account => !account);
-  if (!badAccounts.length) {
-    console.log(`List of Accounts followers successfully saved for ${accountRows.length} accounts`);
-    return Promise.resolve(accountRows.length);
-  } else {
-    console.error(`Error saving accounts ${badAccounts}`);
-    return Promise.reject(`Error saving accounts ${badAccounts}`);
+const getFollowers = async (session, accountId) => {
+  try {
+    const feed = new Client.Feed.AccountFollowers(session, accountId);
+    return await feed.get();
+  } catch (err) {
+    console.error(`Unable to fetch accounts from Instagram ${err}`);
+    throw err;
   }
+};
+
+module.exports = async ({username, password}) => {
+  const session = await sessionSingleton.session.createSession({username, password});
+  const accountId = await session.getAccountId();
+  const followersResults = await getFollowers(session, accountId);
+
+  console.log(`Found follower ${followersResults.length} accounts`);
+  const cachedFollowersAccounts = await dynamoDBHandler.getInstance().getFollowers(username);
+
+  const updatedUsers = compareCachedToFetched(cachedFollowersAccounts, followersResults);
+  await updatedUsers.forEach(async (user) => {
+    await dynamoDBHandler.getInstance().addFollowersAccountOrUpdateUsername(username, user.instagramId, user.username, user.isActive)
+  })
+  console.log(`List of Accounts followers successfully saved for ${updatedUsers.length} accounts`);
 }
