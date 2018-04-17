@@ -13,11 +13,11 @@ const getLastLikedMediaTimestamp = (medias) => {
 module.exports = async ({username, password}) => {
   const [session, accountsRelated] = await Promise.all([
     sessionSingleton.session.createSession({username, password}),
-    dynamoDBHandler.getInstance().getAccountsPossiblyRequiringInteraction(username),
+    dynamoDBHandler.getInstance().getAccountsPossiblyRequiringInteraction(username, 10),
   ]);
   const log = [];
 
-  let usersMedia = await Promise.mapSeries(_.slice(accountsRelated, 0, 20), async account => {
+  let usersMedia = await Promise.mapSeries(accountsRelated, async account => {
     try {
       const userMedia = new Client.Feed.UserMedia(session, account.instagramId, 1);
       const medias = await userMedia.get();

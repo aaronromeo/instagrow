@@ -315,20 +315,6 @@ class DynamoDBService {
     };
   }
 
-  // createBackup(username) {
-    // const backupName = `${this.getUserTableName(username)}-Bkup-${moment().valueOf()}`
-    // const backupParams = {
-      // BackupName: backupName,
-      // TableName: this.getUserTableName(username),
-    // };
-//
-    // return this.db.createBackup(backupParams).promise()
-      // .then(() => {
-        // console.log(backupName);
-        // return Promise.resolve(backupName);
-      // })
-  // }
-
   async importData(username) {
     const backupName = `${this.getUserTableName(username)}-Bkup-${moment().valueOf()}`
     const backupParams = {
@@ -565,7 +551,7 @@ class DynamoDBService {
     }
   };
 
-  async getAccountsPossiblyRequiringInteraction(username) {
+  async getAccountsPossiblyRequiringInteraction(username, limit=null) {
     const followerInteractionDeltaInDays = await this.followerInteractionDeltaInDays(username);
     const followingInteractionDeltaInDays = await this.followingInteractionDeltaInDays(username);
     const followerInteractionAgeThreshold = followerInteractionDeltaInDays && moment().subtract(followerInteractionDeltaInDays, 'd');
@@ -588,6 +574,10 @@ class DynamoDBService {
       ExpressionAttributeValues: expressionAttributeValues,
     };
 
+    if (limit) {
+      params["Limit"] = limit;
+    }
+
     try {
       const data = await this.docClient.scan(params).promise();
       return data.Items;
@@ -597,7 +587,7 @@ class DynamoDBService {
     }
   };
 
-  async getAccountsToBeLiked(username) {
+  async getAccountsToBeLiked(username, limit=null) {
     const followingInteractionDeltaInDays = await this.followingInteractionDeltaInDays(username);
     const followerInteractionDeltaInDays = await this.followerInteractionDeltaInDays(username);
     const maximumAgeOfContentConsidered = moment().subtract(1, 'w');
@@ -622,6 +612,10 @@ class DynamoDBService {
       ExpressionAttributeValues: expressionAttributeValues,
     };
 
+    if (limit) {
+      params["Limit"] = limit;
+    }
+
     try {
       const data = await this.docClient.scan(params).promise();
       return data.Items;
@@ -630,40 +624,6 @@ class DynamoDBService {
       throw err;
     }
    };
-
-  // async getNextAccountsToBeLiked(username) {
-  //   const followingInteractionDeltaInDays = await this.followingInteractionDeltaInDays(username);
-  //   const followerInteractionDeltaInDays = await this.followerInteractionDeltaInDays(username);
-  //   const maximumAgeOfContentConsidered = moment().subtract(1, 'w');
-  //   const followingInteractionAgeThreshold = moment().subtract(followingInteractionDeltaInDays, 'd');
-  //   const followerInteractionAgeThreshold = followerInteractionDeltaInDays && moment().subtract(followerInteractionDeltaInDays, 'd');
-  //   const followingClause = "latestMediaCreatedAt > :lmca AND lastInteractionAt < latestMediaCreatedAt AND lastInteractionAt < :lifollowing AND isActive=:true AND isFollowing=:true";
-  //   const followerClause = followerInteractionAgeThreshold ? "latestMediaCreatedAt > :lmca AND lastInteractionAt < latestMediaCreatedAt AND lastInteractionAt < :lifollower AND isActive=:true AND isFollower=:true" : "";
-  //   const filterExpression = followerClause ? `(${followingClause}) OR (${followerClause})` : followingClause;
-  //   const expressionAttributeValues = {
-  //     ":lmca": maximumAgeOfContentConsidered.valueOf(),
-  //     ":lifollowing": followingInteractionAgeThreshold.valueOf(),
-  //     ":true": true,
-  //   }
-  //   if (followerInteractionAgeThreshold) {
-  //     expressionAttributeValues[":lifollower"] = followerInteractionAgeThreshold.valueOf();
-  //   }
-
-  //   const params = {
-  //     TableName: this.getUserTableName(username),
-  //     FilterExpression: filterExpression,
-  //     ExpressionAttributeValues: expressionAttributeValues,
-  //     Limit: 1,
-  //   };
-
-  //   try {
-  //     const data = await this.docClient.scan(params).promise();
-  //     return data.Items && data.Items[0];
-  //   } catch(err) {
-  //     console.error(`Unable to getAccountsToBeLiked ${err}`);
-  //     throw err;
-  //   }
-  //  };
 
   async addFollowersAccountOrUpdateUsername(username, instagramId, followerUsername, isActive=true) {
     const account = await this.getAccountByInstagramId(username, instagramId);
@@ -729,31 +689,6 @@ class DynamoDBService {
       throw err;
     }
   }
-
-  // async addLatestMediaBlockToPendingTable(username, chunkedShuffledMediaBlock) {
-  //   const subItems = chunkedShuffledMediaBlock.map(item => {
-  //     return {
-  //       instagramId: item.instagramId,
-  //       mediaId: item.latestMediaId,
-  //       mediaUrl: item.latestMediaUrl,
-  //       followerFollowingUsername: item.username,
-  //     }
-  //   });
-  //   const params = {
-  //     TableName: this.getPendingMediaTableName(username),
-  //     Item: {
-  //       id: moment().valueOf(),
-  //       block: subItems,
-  //     },
-  //   };
-  //   try {
-  //     await this.docClient.put(params).promise();
-  //   } catch(err) {
-  //     console.error(`Error in addLatestMediaBlockToPendingTable ${err}`);
-  //     throw err;
-  //   }
-  //   return {count: subItems.length};
-  // }
 
   async addLatestMediaToPendingTable(username, instagramId, mediaId, mediaUrl, followUsername) {
     const params = {
