@@ -1,6 +1,4 @@
 const tough = require('tough-cookie');
-const Promise = require('bluebird');
-
 const Store = tough.Store;
 const permuteDomain = tough.permuteDomain;
 const permutePath = tough.permutePath;
@@ -9,14 +7,14 @@ const dynamodb = require('./dynamodb');
 const util = require('util');
 
 
-const saveToDB = async (data, cb) => {
+const saveToDB = async (username, data, cb) => {
   const dataJson = JSON.stringify(data);
-  await dynamodb.handler.getInstance().putCookiesForUser(dataJson);
+  await dynamodb.handler.getInstance().putCookiesForUser(username, dataJson);
   cb();
 }
 
-const loadFromDB = async (cb) => {
-  const data = await dynamodb.handler.getInstance().getCookiesForUser();
+const loadFromDB = async (username, cb) => {
+  const data = await dynamodb.handler.getInstance().getCookiesForUser(username);
   const dataJson = data ? JSON.parse(data) : null;
   for (const domainName in dataJson) {
     for (const pathName in dataJson[domainName]) {
@@ -29,14 +27,16 @@ const loadFromDB = async (cb) => {
 }
 
 class DynamoDBCookieStore extends Store {
-  constructor() {
+  constructor(username) {
+    if (!username) throw new Error("A username is required");
     super()
+    this.username = username;
     this.idx = {}; // idx is memory cache
     this.initialized = false;
   }
 
   async init() {
-    await loadFromDB(dataJson => {
+    await loadFromDB(this.username, dataJson => {
       if (dataJson)
         this.idx = dataJson;
     });
@@ -126,7 +126,7 @@ class DynamoDBCookieStore extends Store {
       this.idx[cookie.domain][cookie.path] = {};
     }
     this.idx[cookie.domain][cookie.path][cookie.key] = cookie;
-    saveToDB(this.idx, () => {
+    saveToDB(this.username, this.idx, () => {
       cb(null);
     });
   }
@@ -144,7 +144,7 @@ class DynamoDBCookieStore extends Store {
     if (this.idx[domain] && this.idx[domain][path] && this.idx[domain][path][key]) {
       delete this.idx[domain][path][key];
     }
-    saveToDB(this.idx, () => {
+    saveToDB(this.username, this.idx, () => {
       cb(null);
     });
   }
@@ -158,7 +158,7 @@ class DynamoDBCookieStore extends Store {
         delete this.idx[domain];
       }
     }
-    saveToDB(this.idx, () => cb(null));
+    saveToDB(this.username, this.idx, () => cb(null));
   }
 }
 

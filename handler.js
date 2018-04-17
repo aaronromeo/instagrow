@@ -1,8 +1,13 @@
 require('dotenv').config();
-const constants = require("./src/constants");
 const Promise = require('bluebird');
-
-'use strict';
+const constants = require("./src/constants");
+const dynamoDBHandler = require("./src/services/dynamodb").handler;
+const getLatestMediaOfAccounts = require("./src/getLatestMediaOfAccounts");
+const addPendingLikeMediaToQueue = require("./src/addPendingLikeMediaToQueue");
+const getAccountFollowers = require("./src/getAccountFollowers");
+const getAccountsFollowing = require("./src/getAccountsFollowing");
+const getLatestActivityOfAccounts = require("./src/getLatestActivityOfAccounts");
+const updateLikedMedia = require("./src/updateLikedMedia");
 
 const getSetupVars = async (event) => {
   const username = event["account"] || process.env.ACCOUNT;
@@ -15,31 +20,166 @@ const getSetupVars = async (event) => {
   };
 }
 
-module.exports.getFollowingAndFollowers = async (event, context, callback) => {
+module.exports.setUpNewApplication = async (event, context, callback) => {
   let response = {};
   try {
-    const {username} = await getSetupVars(event, callback);
-    const config = require(`./config.${username}.json`);
-    const accountsFollowing = require("./src/getAccountsFollowing");
-    const accountFollowers = require("./src/getAccountFollowers");
+    dynamoDBHandler.createInstance();
+    dynamoDBHandler.getInstance().createGeneralDB();
 
-    const getFollowingAndFollowersAsync = async () => {
-      const numAccountsFollowing = await accountsFollowing.getAccountsFollowing(config, constants.settings.DATABASE_OBJECT);
-      const numAccountFollowers = await accountFollowers.getAccountFollowers(config, constants.settings.DATABASE_OBJECT);
-
-      return [numAccountsFollowing, numAccountFollowers]
-    }
-
-    constants.settings.DATABASE_OBJECT.handler.createInstance(config);
-
-    const [numAccountsFollowing, numAccountFollowers] = await getFollowingAndFollowersAsync();
     response = {
       statusCode: 200,
       body: JSON.stringify({
         message: `Successful run`,
+      })
+    };
+  } catch(err) {
+    console.error(`Error ${err}`);
+    response = {
+      statusCode: 400,
+      body: JSON.stringify({
+        message: err,
+      }),
+    };
+  } finally {
+    callback(null, response);
+  }
+};
+
+module.exports.setUpNewUserConfig = async (event, context, callback) => {
+  let response = {};
+  try {
+    const username = process.env.ACCOUNT;
+    const password = process.env.PASSWORD;
+    const followingInteractionDeltaInDays = process.env.FOLLOWING_INTERACTION_DELTA_IN_DAYS || constants.FOLLOWING_INTERACTION_DELTA_IN_DAYS;
+    const followerInteractionDeltaInDays = process.env.FOLLOWER_INTERACTION_DELTA_IN_DAYS || constants.FOLLOWER_INTERACTION_DELTA_IN_DAYS;
+
+    if (!username) {
+      throw new Error("Incorrect configuration - missing username");
+    }
+
+    if (!password) {
+      throw new Error("Incorrect configuration - missing password");
+    }
+
+    dynamoDBHandler.createInstance();
+    await dynamoDBHandler.getInstance().createAccountDB(username);
+    await dynamoDBHandler.getInstance().putUserAuthentication(username, password);
+    await dynamoDBHandler.getInstance().putUserEnabled(username, false);
+    await dynamoDBHandler.getInstance().putUserFollowingInteractionDeltaInDays(username, followingInteractionDeltaInDays);
+    await dynamoDBHandler.getInstance().putUserFollowerInteractionDeltaInDays(username, followerInteractionDeltaInDays);
+
+    response = {
+      statusCode: 200,
+      body: JSON.stringify({
+        message: `Successful run`,
+      })
+    };
+  } catch(err) {
+    console.error(`Error ${err}`);
+    response = {
+      statusCode: 400,
+      body: JSON.stringify({
+        message: err,
+      }),
+    };
+  } finally {
+    callback(null, response);
+  }
+};
+
+module.exports.setUpScalingPolicy = async (event, context, callback) => {
+  let response = {};
+  try {
+    const username = process.env.ACCOUNT;
+
+    if (!username) {
+      throw new Error("Incorrect configuration - missing username");
+    }
+
+    dynamoDBHandler.createInstance();
+    await dynamoDBHandler.getInstance().createAccountScalingPolicy(username);
+
+    response = {
+      statusCode: 200,
+      body: JSON.stringify({
+        message: `Successful run`,
+      })
+    };
+  } catch(err) {
+    console.error(`Error ${err}`);
+    response = {
+      statusCode: 400,
+      body: JSON.stringify({
+        message: err,
+      }),
+    };
+  } finally {
+    callback(null, response);
+  }
+};
+
+module.exports.getFollowers = async (event, context, callback) => {
+  let response = {};
+  try {
+    const getFollowersAsync = async ({username, password}) => {
+      const numAccountFollowers = await getAccountFollowers({username, password});
+      return numAccountFollowers;
+    }
+
+    dynamoDBHandler.createInstance();
+    const username = await dynamoDBHandler.getInstance().getNextUserForFunction('getFollowers');
+    if (!username) throw new Error("No username defined for function 'getFollowers'");
+
+    const password = await dynamoDBHandler.getInstance().getPasswordForUser(username);
+    if (!password) throw new Error("No password defined for function 'getFollowers'");
+
+    const numAccountFollowers = await getFollowersAsync({username, password});
+    await dynamoDBHandler.getInstance().putTimestampForFunction(username, 'getFollowers');
+    response = {
+      statusCode: 200,
+      body: JSON.stringify({
+        message: "Successful run",
+        data: {
+          numAccountFollowers: numAccountFollowers,
+        }
+      })
+    };
+  } catch(err) {
+    console.error(`Error ${err}`);
+    response = {
+      statusCode: 400,
+      body: JSON.stringify({
+        message: err,
+      }),
+    };
+  } finally {
+    callback(null, response);
+  }
+};
+
+module.exports.getFollowing = async (event, context, callback) => {
+  let response = {};
+  try {
+    const getFollowingAsync = async ({username, password}) => {
+      const numAccountsFollowing = await getAccountsFollowing({username, password});
+      return numAccountsFollowing;
+    }
+
+    dynamoDBHandler.createInstance();
+    const username = await dynamoDBHandler.getInstance().getNextUserForFunction('getFollowing');
+    if (!username) throw new Error("No username defined for function 'getFollowing'");
+
+    const password = await dynamoDBHandler.getInstance().getPasswordForUser(username);
+    if (!password) throw new Error("No password defined for function 'getFollowing'");
+
+    const numAccountsFollowing = await getFollowingAsync({username, password});
+    await dynamoDBHandler.getInstance().putTimestampForFunction(username, 'getFollowing');
+    response = {
+      statusCode: 200,
+      body: JSON.stringify({
+        message: "Successful run",
         data: {
           numAccountsFollowing: numAccountsFollowing,
-          numAccountFollowers: numAccountFollowers,
         }
       })
     };
@@ -59,17 +199,18 @@ module.exports.getFollowingAndFollowers = async (event, context, callback) => {
 module.exports.updateInteractionActivity = async (event, context, callback) => {
   let response = {};
   try {
-    const {username} = await getSetupVars(event, callback);
-    const config = require(`./config.${username}.json`);
-    const latestActivityOfFollowedAccounts = require("./src/getLatestActivityOfAccounts");
-
-    const updateInteractionActivityAsync = async () => {
-      return await latestActivityOfFollowedAccounts.getLatestActivityOfAccounts(config, constants.settings.DATABASE_OBJECT);
+    const updateInteractionActivityAsync = async ({username, password}) => {
+      return await getLatestActivityOfAccounts({username, password});
     }
 
-    constants.settings.DATABASE_OBJECT.handler.createInstance(config);
+    dynamoDBHandler.createInstance();
+    const username = await dynamoDBHandler.getInstance().getNextUserForFunction('updateInteractionActivity');
+    if (!username) throw new Error("No username defined for function 'updateInteractionActivity'");
 
-    const log = await updateInteractionActivityAsync();
+    const password = await dynamoDBHandler.getInstance().getPasswordForUser(username);
+    if (!password) throw new Error("No password defined for function 'updateInteractionActivity'");
+
+    const log = await updateInteractionActivityAsync({username, password});
     response = {
       statusCode: 200,
       body: JSON.stringify({
@@ -92,24 +233,58 @@ module.exports.updateInteractionActivity = async (event, context, callback) => {
   }
 };
 
-module.exports.addPendingLikeMediaToQueue = async (event, context, callback) => {
+module.exports.getLatestMediaOfAccounts = async (event, context, callback) => {
   let response = {};
+  const addPendingLikeMediaToQueueAsync = async ({username, password}) => {
+    return await getLatestMediaOfAccounts({username, password});
+  }
+
   try {
-    const {username} = await getSetupVars(event, callback);
-    const config = require(`./config.${username}.json`);
-    const latestMediaOfFollowedAccounts = require("./src/getLatestMediaOfAccounts");
-    const pendingLikeMediaToQueue = require("./src/addPendingLikeMediaToQueue");
+    dynamoDBHandler.createInstance();
+    const username = await dynamoDBHandler.getInstance().getNextUserForFunction('getLatestMediaOfAccounts');
+    if (!username) throw new Error("No username defined for function 'getLatestMediaOfAccounts'");
 
-    const addPendingLikeMediaToQueueAsync = async () => {
-      const log = await latestMediaOfFollowedAccounts.getLatestMediaOfAccounts(config, constants.settings.DATABASE_OBJECT);
-      log.concat(await pendingLikeMediaToQueue.addPendingLikeMediaToQueue(config, constants.settings.DATABASE_OBJECT));
+    const password = await dynamoDBHandler.getInstance().getPasswordForUser(username);
+    if (!password) throw new Error("No password defined for function 'getLatestMediaOfAccounts'");
 
-      return log;
-    }
+    const log = await addPendingLikeMediaToQueueAsync({username, password});
+    response = {
+      statusCode: 200,
+      body: JSON.stringify({
+        message: `Successful run`,
+        data: {
+          log: log,
+        }
+      })
+    };
+  } catch(err) {
+    console.error(`Error ${err}`);
+    response = {
+      statusCode: 400,
+      body: JSON.stringify({
+        message: err,
+      }),
+    };
+  } finally {
+    callback(null, response);
+  }
+};
 
-    constants.settings.DATABASE_OBJECT.handler.createInstance(config);
+module.exports.queuePendingLikeMedia = async (event, context, callback) => {
+  let response = {};
+  const addPendingLikeMediaToQueueAsync = async ({username, password}) => {
+    return await addPendingLikeMediaToQueue({username});
+  }
 
-    const log = await addPendingLikeMediaToQueueAsync();
+  try {
+    dynamoDBHandler.createInstance();
+    const username = await dynamoDBHandler.getInstance().getNextUserForFunction('queuePendingLikeMedia');
+    if (!username) throw new Error("No username defined for function 'queuePendingLikeMedia'");
+
+    const password = await dynamoDBHandler.getInstance().getPasswordForUser(username);
+    if (!password) throw new Error("No password defined for function 'queuePendingLikeMedia'");
+
+    const log = await addPendingLikeMediaToQueueAsync({username, password});
     response = {
       statusCode: 200,
       body: JSON.stringify({
@@ -135,18 +310,18 @@ module.exports.addPendingLikeMediaToQueue = async (event, context, callback) => 
 module.exports.updateLikedMedia = async (event, context, callback) => {
   let response = {};
   try {
-    const {username} = await getSetupVars(event, callback);
-    const config = require(`./config.${username}.json`);
-
-    const likedMedia = require("./src/updateLikedMedia");
-
-    const updateLikedMediaAsync = async () => {
-      return await likedMedia.updateLikedMedia(config, constants.settings.DATABASE_OBJECT);
+    const updateLikedMediaAsync = async ({username, password}) => {
+      return await updateLikedMedia({username, password});
     }
 
-    constants.settings.DATABASE_OBJECT.handler.createInstance(config);
+    dynamoDBHandler.createInstance();
+    const username = await dynamoDBHandler.getInstance().getNextUserForFunction('addPendingLikeMediaToQueue');
+    if (!username) throw new Error("No username defined for function 'addPendingLikeMediaToQueue'");
 
-    const log = await updateLikedMediaAsync();
+    const password = await dynamoDBHandler.getInstance().getPasswordForUser(username);
+    if (!password) throw new Error("No password defined for function 'addPendingLikeMediaToQueue'");
+
+    const log = await updateLikedMediaAsync({username, password});
     response = {
       statusCode: 200,
       body: JSON.stringify({

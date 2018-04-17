@@ -1,56 +1,69 @@
 const Client = require('instagram-private-api').V1;
 const _ = require('lodash');
+const dynamoDBHandler = require("./services/dynamodb").handler;
 const Promise = require('bluebird');
 
 const sessionSingleton = require("./services/sessionSingleton");
 
-exports.getLatestMediaOfAccounts = async (config, db) => {
-  const [ session, accountsRelated] = await Promise.all([
-    sessionSingleton.session.createSession(config),
-    db.handler.getInstance().getAccountsPossiblyRequiringInteraction(),
+const getLastLikedMediaTimestamp = (medias) => {
+  const likedMedia = medias.filter(media => media._params.hasLiked) || {};
+  return likedMedia.length ? likedMedia[0]._params.takenAt : 0;
+}
+
+module.exports = async ({username, password}) => {
+  const [session, accountsRelated] = await Promise.all([
+    sessionSingleton.session.createSession({username, password}),
+    dynamoDBHandler.getInstance().getAccountsPossiblyRequiringInteraction(username, 10),
   ]);
   const log = [];
 
-  const accountsRelatedUserMedia = await Promise.map(accountsRelated, async accountFollowing => {
-    return new Client.Feed.UserMedia(session, accountFollowing.instagramId, 1);
-  })
-
-  let usersMedia = await Promise.map(accountsRelatedUserMedia, latestUserMedia => {
-    return latestUserMedia.get()
-      .catch(e => {
-        log.push(`${e.message} trying to retrieve ${latestUserMedia.accountId}`);
-        console.log(`${e.message} trying to retrieve ${latestUserMedia.accountId}`);
-      });
-  });
-
-  usersMedia = await Promise.map(_.compact(usersMedia), medias => {
-    if (!medias.length === 0 || !medias[0] || !medias[0]._params) {
-      return null;
+  let usersMedia = await Promise.mapSeries(accountsRelated, async account => {
+    try {
+      const userMedia = new Client.Feed.UserMedia(session, account.instagramId, 1);
+      const medias = await userMedia.get();
+      if (!medias.length === 0 || !medias[0] || !medias[0]._params) {
+        await dynamoDBHandler.getInstance().updateLatestMediaDetails(
+          username,
+          account.instagramId,
+          null,
+          null,
+          0,
+        )
+      } else {
+        const lastLikedMediaTimestamp = getLastLikedMediaTimestamp(medias);
+        if (lastLikedMediaTimestamp && (!account.lastInteractionAt || account.lastInteractionAt < lastLikedMediaTimestamp)) {
+          await Promise.all([
+            dynamoDBHandler.getInstance().updateLatestMediaDetails(
+              username,
+              medias[0]._params.user.pk,
+              medias[0]._params.id,
+              medias[0]._params.webLink,
+              medias[0]._params.takenAt,
+            ),
+            dynamoDBHandler.getInstance().updateLastInteration(
+              username,
+              account.instagramId,
+              lastLikedMediaTimestamp,
+            ),
+          ]);
+        } else {
+          await dynamoDBHandler.getInstance().updateLatestMediaDetails(
+            username,
+            medias[0]._params.user.pk,
+            medias[0]._params.id,
+            medias[0]._params.webLink,
+            medias[0]._params.takenAt,
+          )
+        }
+      }
+    } catch(e) {
+      log.push(`${e.message} trying to retrieve ${account.instagramId}`);
+      console.log(`${e.message} trying to retrieve ${account.instagramId}`);
     };
-    if (medias[0]._params.hasLiked) {
-      return Promise.all([
-        db.handler.getInstance().updateLatestMediaDetails(
-          medias[0]._params.user.pk,
-          medias[0]._params.id,
-          medias[0]._params.webLink,
-          medias[0]._params.takenAt,
-        ),
-        db.handler.getInstance().updateLastInteration(
-          medias[0]._params.user.pk,
-          medias[0]._params.takenAt,
-        ),
-      ]);
-    } else {
-      return db.handler.getInstance().updateLatestMediaDetails(
-        medias[0]._params.user.pk,
-        medias[0]._params.id,
-        medias[0]._params.webLink,
-        medias[0]._params.takenAt,
-      )
-    }
+    return account.instagramId
   });
 
   log.push(`Account media followed successfully saved for ${usersMedia.length} accounts!`);
   console.log(`Account media followed successfully saved for ${usersMedia.length} accounts!`);
-  return Promise.resolve(log);
+  return log;
 }

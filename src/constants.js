@@ -1,7 +1,7 @@
 const dynamodbService = require("./services/dynamodb");
 
 const FOLLOWING_INTERACTION_DELTA_IN_DAYS = 3;
-const FOLLOWER_INTERACTION_DELTA_IN_DAYS = 14;
+const FOLLOWER_INTERACTION_DELTA_IN_DAYS = 0;
 const DATABASE_OBJECT = dynamodbService;
 
 exports.settings = {

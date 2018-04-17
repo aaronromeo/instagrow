@@ -1,15 +1,13 @@
 const Client = require('instagram-private-api').V1;
 const Promise = require('bluebird');
 const _ = require('lodash');
+const dynamoDBHandler = require("./services/dynamodb").handler;
 const moment = require('moment');
 
 const sessionSingleton = require("./services/sessionSingleton");
 
-exports.addPendingLikeMediaToQueue = async (config, db) => {
-  const [session, accountsRelated] = await Promise.all([
-    sessionSingleton.session.createSession(config),
-    db.handler.getInstance().getAccountsToBeLiked(),
-  ]);
+module.exports = async ({username}) => {
+  const accountsRelated = await dynamoDBHandler.getInstance().getAccountsToBeLiked(username, 20);
 
   const log = [];
   if (accountsRelated.length) {
@@ -23,7 +21,8 @@ exports.addPendingLikeMediaToQueue = async (config, db) => {
   }
   console.log();
   await Promise.mapSeries(_.shuffle(accountsRelated), accountToBeInteractedWith => {
-    return db.handler.getInstance().addLatestMediaToPendingTable(
+    return dynamoDBHandler.getInstance().addLatestMediaToPendingTable(
+      username,
       accountToBeInteractedWith.instagramId,
       accountToBeInteractedWith.latestMediaId,
       accountToBeInteractedWith.latestMediaUrl,
@@ -31,5 +30,5 @@ exports.addPendingLikeMediaToQueue = async (config, db) => {
     )
   });
 
-  return Promise.resolve(log);
+  return log;
 }

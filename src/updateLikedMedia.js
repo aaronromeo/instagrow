@@ -1,6 +1,7 @@
 const Client = require('instagram-private-api').V1;
 const Promise = require('bluebird');
 const _ = require('lodash');
+const dynamoDBHandler = require("./services/dynamodb").handler;
 const moment = require('moment');
 
 const sessionSingleton = require("./services/sessionSingleton");
@@ -9,13 +10,11 @@ const MIN_DELAY = 2000;
 const MAX_DELAY = 10000;
 const MAX_RUNTIME = 100000;
 
-const likeMedia = async (session, account, db) => {
+const likeMedia = async (username, session, account) => {
   console.log(`Liking ${account.username}\t(${account.instagramId})\t${account.mediaUrl} at ${moment()}`);
-  await Promise.all([
-    new Client.Like.create(session, account.mediaId),
-    db.handler.getInstance().updateLastInteration(account.instagramId, moment().valueOf()),
-    db.handler.getInstance().deleteMediaFromPendingTable(account.instagramId, account.mediaId),
-  ]);
+  await new Client.Like.create(session, account.mediaId);
+  await dynamoDBHandler.getInstance().updateLastInteration(username, account.instagramId, moment().valueOf());
+  await dynamoDBHandler.getInstance().deleteMediaFromPendingTable(username, account.instagramId, account.mediaId);
   return `Liking ${account.username}\t(${account.instagramId})\t${account.mediaUrl} at ${moment()}`;
 }
 
@@ -25,17 +24,17 @@ const getRandomInt = (min, max) => {
   return Math.floor(Math.random() * (max - min)) + min; //The maximum is exclusive and the minimum is inclusive
 }
 
-exports.updateLikedMedia = async (config, db) => {
+module.exports = async ({username, password}) => {
   const [session, mediaToBeLiked] = await Promise.all([
-    sessionSingleton.session.createSession(config),
-    db.handler.getInstance().getLatestMediaFromPendingTable(),
+    sessionSingleton.session.createSession({username, password}),
+    dynamoDBHandler.getInstance().getLatestMediaFromPendingTable(username),
   ]);
   const log = [];
 
   if (!mediaToBeLiked.length) {
     console.log("No interactions required");
     log.push("No interactions required");
-    return Promise.resolve(log)
+    return log
   }
 
   console.log("Bot will like the following accounts");
@@ -53,13 +52,13 @@ exports.updateLikedMedia = async (config, db) => {
     if (totalRunTime > MAX_RUNTIME) {
       console.log(`Timing out at ${totalRunTime}ms`);
       log.push(`Timing out at ${totalRunTime}ms`);
-      return Promise.resolve(log);
+      return log;
     }
     await Promise.delay(nextRun)
-    const message = await likeMedia(session, mediaToBeInteractedWith, db);
+    const message = await likeMedia(username, session, mediaToBeInteractedWith);
     log.push(message);
-    return Promise.resolve();
+    return log;
   });
 
-  return Promise.resolve(log);
+  return log;
 }
