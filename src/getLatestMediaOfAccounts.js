@@ -15,6 +15,8 @@ module.exports = async ({username, password}) => {
     sessionSingleton.session.createSession({username, password}),
     dynamoDBHandler.getInstance().getAccountsPossiblyRequiringInteraction(username, 10),
   ]);
+  if (session._device.username !== username) throw new Error(`Session ${session._device.username} does not match the ${username}`);
+
   const log = [];
 
   let usersMedia = await Promise.mapSeries(accountsRelated, async account => {

@@ -35,6 +35,8 @@ module.exports = async ({username, password}) => {
     sessionSingleton.session.createSession({username, password}),
     dynamoDBHandler.getInstance().getMediaWithLastInteraction(username),
   ]);
+  if (session._device.username !== username) throw new Error(`Session ${session._device.username} does not match the ${username}`);
+
   const log = [];
 
   if (!lastInteraction || !lastInteraction.username) {
