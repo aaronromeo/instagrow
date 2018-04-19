@@ -211,6 +211,7 @@ module.exports.updateInteractionActivity = async (event, context, callback) => {
     if (!password) throw new Error("No password defined for function 'updateInteractionActivity'");
 
     const log = await updateInteractionActivityAsync({username, password});
+    await dynamoDBHandler.getInstance().putTimestampForFunction(username, 'updateInteractionActivity');
     response = {
       statusCode: 200,
       body: JSON.stringify({
@@ -248,6 +249,7 @@ module.exports.getLatestMediaOfAccounts = async (event, context, callback) => {
     if (!password) throw new Error("No password defined for function 'getLatestMediaOfAccounts'");
 
     const log = await addPendingLikeMediaToQueueAsync({username, password});
+    await dynamoDBHandler.getInstance().putTimestampForFunction(username, 'getLatestMediaOfAccounts');
     response = {
       statusCode: 200,
       body: JSON.stringify({
@@ -285,6 +287,7 @@ module.exports.queuePendingLikeMedia = async (event, context, callback) => {
     if (!password) throw new Error("No password defined for function 'queuePendingLikeMedia'");
 
     const log = await addPendingLikeMediaToQueueAsync({username, password});
+    await dynamoDBHandler.getInstance().putTimestampForFunction(username, 'queuePendingLikeMedia');
     response = {
       statusCode: 200,
       body: JSON.stringify({
@@ -315,13 +318,14 @@ module.exports.updateLikedMedia = async (event, context, callback) => {
     }
 
     dynamoDBHandler.createInstance();
-    const username = await dynamoDBHandler.getInstance().getNextUserForFunction('addPendingLikeMediaToQueue');
-    if (!username) throw new Error("No username defined for function 'addPendingLikeMediaToQueue'");
+    const username = await dynamoDBHandler.getInstance().getNextUserForFunction('updateLikedMedia');
+    if (!username) throw new Error("No username defined for function 'updateLikedMedia'");
 
     const password = await dynamoDBHandler.getInstance().getPasswordForUser(username);
-    if (!password) throw new Error("No password defined for function 'addPendingLikeMediaToQueue'");
+    if (!password) throw new Error("No password defined for function 'updateLikedMedia'");
 
     const log = await updateLikedMediaAsync({username, password});
+    await dynamoDBHandler.getInstance().putTimestampForFunction(username, 'updateLikedMedia');
     response = {
       statusCode: 200,
       body: JSON.stringify({
