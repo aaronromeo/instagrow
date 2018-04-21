@@ -3,7 +3,6 @@ const AWS = require("aws-sdk");
 const DynamoDB = Promise.promisifyAll(require("aws-sdk").DynamoDB);
 const fs = require('fs');
 const _ = require('lodash');
-const humps = require('humps');
 const moment = require('moment');
 const constants = require("../constants");
 const dataMarshalService = require("./dataMarshal");
@@ -435,7 +434,7 @@ class DynamoDBService {
     try {
       const usernames = await this.getUsers();
       const usernameObject = usernames.reduce((accumulator, username) => {
-        accumulator[`:${username}`] = username;
+        accumulator[`:${_.replace(username, /[^A-Za-z0-9]+/, "_")}`] = username;
         return accumulator;
       }, {});
       const params = {
@@ -454,6 +453,7 @@ class DynamoDBService {
         }
         return accumulator;
       }, {username: null, max: moment().valueOf()});
+      console.log(`Running ${funcName} for user ${usernameMap.username}`);
       return usernameMap.username;
     } catch(err) {
       console.error(`Unable to get the function ${err}`);

@@ -6,7 +6,7 @@ const compareCachedToFetched = require("./utils/compareCachedToFetched");
 const getFollowers = async (session, accountId) => {
   try {
     const feed = new Client.Feed.AccountFollowers(session, accountId);
-    return await feed.get();
+    return await feed.all();
   } catch (err) {
     console.error(`Unable to fetch accounts from Instagram ${err}`);
     throw err;
