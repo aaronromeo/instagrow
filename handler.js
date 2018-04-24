@@ -34,7 +34,7 @@ module.exports.setUpNewApplication = async (event, context, callback) => {
     };
     return callback(null, response);
   } catch(err) {
-    console.error("Error", err);
+    console.error(err);
     response = {
       statusCode: 400,
       body: JSON.stringify({
@@ -76,7 +76,7 @@ module.exports.setUpNewUserConfig = async (event, context, callback) => {
     };
     return callback(null, response);
   } catch(err) {
-    console.error("Error", err);
+    console.error(err);
     response = {
       statusCode: 400,
       body: JSON.stringify({
@@ -107,7 +107,7 @@ module.exports.setUpScalingPolicy = async (event, context, callback) => {
     };
     return callback(null, response);
   } catch(err) {
-    console.error("Error", err);
+    console.error(err);
     response = {
       statusCode: 400,
       body: JSON.stringify({
@@ -146,7 +146,7 @@ module.exports.getFollowers = async (event, context, callback) => {
     };
     return callback(null, response);
   } catch(err) {
-    console.error("Error", err);
+    console.error(err);
     response = {
       statusCode: 400,
       body: JSON.stringify({
@@ -185,7 +185,7 @@ module.exports.getFollowing = async (event, context, callback) => {
     };
     return callback(null, response);
   } catch(err) {
-    console.error("Error", err);
+    console.error(err);
     response = {
       statusCode: 400,
       body: JSON.stringify({
@@ -223,7 +223,7 @@ module.exports.updateInteractionActivity = async (event, context, callback) => {
     };
     return callback(null, response);
   } catch(err) {
-    console.error("Error", err);
+    console.error(err);
     response = {
       statusCode: 400,
       body: JSON.stringify({
@@ -261,7 +261,7 @@ module.exports.getLatestMediaOfAccounts = async (event, context, callback) => {
     };
     return callback(null, response);
   } catch(err) {
-    console.error("Error", err);
+    console.error(err);
     response = {
       statusCode: 400,
       body: JSON.stringify({
@@ -299,7 +299,7 @@ module.exports.queuePendingLikeMedia = async (event, context, callback) => {
     };
     return callback(null, response);
   } catch(err) {
-    console.error("Error", err);
+    console.error(err);
     response = {
       statusCode: 400,
       body: JSON.stringify({
@@ -337,7 +337,7 @@ module.exports.updateLikedMedia = async (event, context, callback) => {
     };
     return callback(null, response);
   } catch(err) {
-    console.error("Error", err);
+    console.error(err);
     response = {
       statusCode: 400,
       body: JSON.stringify({
