@@ -10,7 +10,7 @@ const createSession = async ({username, password}) => {
   const cookieStore = new DynamoDBCookieStore(username);
   const storage = new Client.CookieStorage(cookieStore);
 
-  if (instance) return instance;
+  if (instance && instance._device && instance._device.username === username) return instance;
 
   const session = await Client.Session.create(device, storage, username, password);
 
@@ -18,7 +18,7 @@ const createSession = async ({username, password}) => {
   return instance;
 };
 
-const getSession = () => instance;
+const getSession = (username) => (instance && instance.username === username) ? instance : null;
 
 exports.session = {
   createSession,
