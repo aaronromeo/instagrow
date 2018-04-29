@@ -18,6 +18,8 @@ module.exports = async ({username, password}) => {
   const accountId = await session.getAccountId();
   const followingResults = await getFollowing(session, accountId);
 
+  if (session._device.username !== username) throw new Error(`Session ${session._device.username} does not match the ${username}`);
+
   console.log(`Found following ${followingResults.length} accounts`);
   const cachedFollowingAccounts = await dynamoDBHandler.getInstance().getFollowing(username);
 

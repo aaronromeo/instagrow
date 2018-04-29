@@ -32,16 +32,16 @@ module.exports.setUpNewApplication = async (event, context, callback) => {
         message: `Successful run`,
       })
     };
+    return callback(null, response);
   } catch(err) {
-    console.error(`Error ${err}`);
+    console.error(err);
     response = {
       statusCode: 400,
       body: JSON.stringify({
         message: err,
       }),
     };
-  } finally {
-    callback(null, response);
+    callback(response);
   }
 };
 
@@ -74,16 +74,16 @@ module.exports.setUpNewUserConfig = async (event, context, callback) => {
         message: `Successful run`,
       })
     };
+    return callback(null, response);
   } catch(err) {
-    console.error(`Error ${err}`);
+    console.error(err);
     response = {
       statusCode: 400,
       body: JSON.stringify({
         message: err,
       }),
     };
-  } finally {
-    callback(null, response);
+    return callback(response);
   }
 };
 
@@ -105,16 +105,16 @@ module.exports.setUpScalingPolicy = async (event, context, callback) => {
         message: `Successful run`,
       })
     };
+    return callback(null, response);
   } catch(err) {
-    console.error(`Error ${err}`);
+    console.error(err);
     response = {
       statusCode: 400,
       body: JSON.stringify({
         message: err,
       }),
     };
-  } finally {
-    callback(null, response);
+    return callback(response);
   }
 };
 
@@ -144,16 +144,16 @@ module.exports.getFollowers = async (event, context, callback) => {
         }
       })
     };
+    return callback(null, response);
   } catch(err) {
-    console.error(`Error ${err}`);
+    console.error(err);
     response = {
       statusCode: 400,
       body: JSON.stringify({
         message: err,
       }),
     };
-  } finally {
-    callback(null, response);
+    return callback(response);
   }
 };
 
@@ -183,16 +183,16 @@ module.exports.getFollowing = async (event, context, callback) => {
         }
       })
     };
+    return callback(null, response);
   } catch(err) {
-    console.error(`Error ${err}`);
+    console.error(err);
     response = {
       statusCode: 400,
       body: JSON.stringify({
         message: err,
       }),
     };
-  } finally {
-    callback(null, response);
+    return callback(response);
   }
 };
 
@@ -221,16 +221,16 @@ module.exports.updateInteractionActivity = async (event, context, callback) => {
         }
       })
     };
+    return callback(null, response);
   } catch(err) {
-    console.error(`Error ${err}`);
+    console.error(err);
     response = {
       statusCode: 400,
       body: JSON.stringify({
         message: err,
       }),
     };
-  } finally {
-    callback(null, response);
+    return callback(response);
   }
 };
 
@@ -259,16 +259,16 @@ module.exports.getLatestMediaOfAccounts = async (event, context, callback) => {
         }
       })
     };
+    return callback(null, response);
   } catch(err) {
-    console.error(`Error ${err}`);
+    console.error(err);
     response = {
       statusCode: 400,
       body: JSON.stringify({
         message: err,
       }),
     };
-  } finally {
-    callback(null, response);
+    return callback(response);
   }
 };
 
@@ -297,16 +297,16 @@ module.exports.queuePendingLikeMedia = async (event, context, callback) => {
         }
       })
     };
+    return callback(null, response);
   } catch(err) {
-    console.error(`Error ${err}`);
+    console.error(err);
     response = {
       statusCode: 400,
       body: JSON.stringify({
         message: err,
       }),
     };
-  } finally {
-    callback(null, response);
+    return callback(response);
   }
 };
 
@@ -335,15 +335,15 @@ module.exports.updateLikedMedia = async (event, context, callback) => {
         }
       })
     };
+    return callback(null, response);
   } catch(err) {
-    console.error(`Error ${err}`);
+    console.error(err);
     response = {
       statusCode: 400,
       body: JSON.stringify({
         message: err,
       }),
     };
-  } finally {
-    callback(null, response);
+    return callback(response);
   }
 };
