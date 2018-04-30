@@ -6,3 +6,4 @@ scratch.txt
 .serverless/*
 .webpack
 serverless.env.yml
+node_modules/*
