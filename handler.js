@@ -133,8 +133,8 @@ module.exports.getFollowers = async (event, context, callback) => {
     const password = await dynamoDBHandler.getInstance().getPasswordForUser(username);
     if (!password) throw new Error("No password defined for function 'getFollowers'");
 
-    const numAccountFollowers = await getFollowersAsync({username, password});
     await dynamoDBHandler.getInstance().putTimestampForFunction(username, 'getFollowers');
+    const numAccountFollowers = await getFollowersAsync({username, password});
     response = {
       statusCode: 200,
       body: JSON.stringify({
@@ -172,8 +172,8 @@ module.exports.getFollowing = async (event, context, callback) => {
     const password = await dynamoDBHandler.getInstance().getPasswordForUser(username);
     if (!password) throw new Error("No password defined for function 'getFollowing'");
 
-    const numAccountsFollowing = await getFollowingAsync({username, password});
     await dynamoDBHandler.getInstance().putTimestampForFunction(username, 'getFollowing');
+    const numAccountsFollowing = await getFollowingAsync({username, password});
     response = {
       statusCode: 200,
       body: JSON.stringify({
@@ -210,8 +210,8 @@ module.exports.updateInteractionActivity = async (event, context, callback) => {
     const password = await dynamoDBHandler.getInstance().getPasswordForUser(username);
     if (!password) throw new Error("No password defined for function 'updateInteractionActivity'");
 
-    const log = await updateInteractionActivityAsync({username, password});
     await dynamoDBHandler.getInstance().putTimestampForFunction(username, 'updateInteractionActivity');
+    const log = await updateInteractionActivityAsync({username, password});
     response = {
       statusCode: 200,
       body: JSON.stringify({
@@ -248,8 +248,8 @@ module.exports.getLatestMediaOfAccounts = async (event, context, callback) => {
     const password = await dynamoDBHandler.getInstance().getPasswordForUser(username);
     if (!password) throw new Error("No password defined for function 'getLatestMediaOfAccounts'");
 
-    const log = await addPendingLikeMediaToQueueAsync({username, password});
     await dynamoDBHandler.getInstance().putTimestampForFunction(username, 'getLatestMediaOfAccounts');
+    const log = await addPendingLikeMediaToQueueAsync({username, password});
     response = {
       statusCode: 200,
       body: JSON.stringify({
@@ -286,8 +286,8 @@ module.exports.queuePendingLikeMedia = async (event, context, callback) => {
     const password = await dynamoDBHandler.getInstance().getPasswordForUser(username);
     if (!password) throw new Error("No password defined for function 'queuePendingLikeMedia'");
 
-    const log = await addPendingLikeMediaToQueueAsync({username, password});
     await dynamoDBHandler.getInstance().putTimestampForFunction(username, 'queuePendingLikeMedia');
+    const log = await addPendingLikeMediaToQueueAsync({username, password});
     response = {
       statusCode: 200,
       body: JSON.stringify({
@@ -324,8 +324,8 @@ module.exports.updateLikedMedia = async (event, context, callback) => {
     const password = await dynamoDBHandler.getInstance().getPasswordForUser(username);
     if (!password) throw new Error("No password defined for function 'updateLikedMedia'");
 
-    const log = await updateLikedMediaAsync({username, password});
     await dynamoDBHandler.getInstance().putTimestampForFunction(username, 'updateLikedMedia');
+    const log = await updateLikedMediaAsync({username, password});
     response = {
       statusCode: 200,
       body: JSON.stringify({
