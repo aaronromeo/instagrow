@@ -25,7 +25,7 @@ const getSelfLikedUptoLastInteraction = async (session, lastInteraction) => {
   try{
     return await getNextSelfLikedInteraction(selfLiked, lastInteraction, interactions);
   } catch(err) {
-    console.error(JSON.stringify(err));
+    console.error(err);
     throw err;
   }
 }
