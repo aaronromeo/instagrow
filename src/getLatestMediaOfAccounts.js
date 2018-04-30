@@ -22,6 +22,7 @@ module.exports = async ({username, password}) => {
   let usersMedia = await Promise.mapSeries(accountsRelated, async account => {
     try {
       const userMedia = new Client.Feed.UserMedia(session, account.instagramId, 1);
+      dynamoDBHandler.getInstance().updateIsActive(username, account.instagramId, false);
       const medias = await userMedia.get();
       if (!medias.length === 0 || !medias[0] || !medias[0]._params) {
         await dynamoDBHandler.getInstance().updateLatestMediaDetails(
@@ -58,6 +59,7 @@ module.exports = async ({username, password}) => {
           )
         }
       }
+      dynamoDBHandler.getInstance().updateIsActive(username, account.instagramId, true);
     } catch(e) {
       log.push(`${e.message} trying to retrieve ${account.instagramId}`);
       console.log(`${e.message} trying to retrieve ${account.instagramId}`);

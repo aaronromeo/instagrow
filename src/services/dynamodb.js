@@ -731,6 +731,24 @@ class DynamoDBService {
     return data.Items;
   }
 
+  async updateIsActive(username, instagramId, isActive) {
+    const params = {
+      TableName: this.getUserTableName(username),
+      Key: {instagramId: instagramId.toString()},
+      UpdateExpression: "set isActive = :isActive",
+      ExpressionAttributeValues:{
+        ":isActive": isActive,
+      },
+      ReturnValues:"UPDATED_NEW"
+    };
+    try {
+      await this.docClient.update(params).promise();
+    } catch(err) {
+      console.error(`Error thrown in updateIsActive ${err}`);
+    }
+    return {instagramId: instagramId};
+  }
+
   async updateLatestMediaDetails(username, instagramId, latestMediaId, latestMediaUrl, latestMediaCreatedAt) {
     const params = {
       TableName: this.getUserTableName(username),
