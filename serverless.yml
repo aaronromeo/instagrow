@@ -11,10 +11,10 @@ provider:
   region: ca-central-1
   vpc:
     securityGroupIds:
-      - ***REMOVED***
+      - ${file(./serverless.env.yml):${opt:stage}.SECURITY_GROUP}
     subnetIds:
-      - ***REMOVED***
-      - ***REMOVED***
+      - ${file(./serverless.env.yml):${opt:stage}.SUBNET_01}
+      - ${file(./serverless.env.yml):${opt:stage}.SUBNET_02}
   environment:
     ACCOUNT: ${file(./serverless.env.yml):${opt:stage}.ACCOUNT}
     PASSWORD: ${file(./serverless.env.yml):${opt:stage}.PASSWORD}
