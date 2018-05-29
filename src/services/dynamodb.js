@@ -1,6 +1,5 @@
 const Promise = require('bluebird');
 const AWS = require("aws-sdk");
-const DynamoDB = Promise.promisifyAll(require("aws-sdk").DynamoDB);
 const fs = require('fs');
 const _ = require('lodash');
 const moment = require('moment');
@@ -21,7 +20,7 @@ const USER_INITIAL_RECORD = (instagramId, username, isFollowing, isFollower) => 
 });
 
 let configOptions = {
-  region: "ca-central-1",
+  region: constants.REGION,
 };
 if (process.env.IS_OFFLINE) {
   console.log("in offline mode");
