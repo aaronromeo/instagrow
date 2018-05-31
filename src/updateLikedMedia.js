@@ -3,8 +3,13 @@ const Promise = require('bluebird');
 const _ = require('lodash');
 const dynamoDBHandler = require("./services/dynamodb").handler;
 const moment = require('moment');
-
 const sessionSingleton = require("./services/sessionSingleton");
+const constants = require("./constants");
+
+const AWS = require("aws-sdk");
+AWS.config.setPromisesDependency(Promise);
+
+const ses = new AWS.SES({apiVersion: "2010-12-01", region: "us-east-1"});
 
 const MIN_DELAY = 2000;
 const MAX_DELAY = 10000;
@@ -22,6 +27,31 @@ const getRandomInt = (min, max) => {
   min = Math.ceil(min);
   max = Math.floor(max);
   return Math.floor(Math.random() * (max - min)) + min; //The maximum is exclusive and the minimum is inclusive
+}
+
+const sendLog = async (username, log) => {
+  const params = {
+    Destination: {
+      ToAddresses: [
+        process.env.SES_ACCOUNT,
+      ]
+    },
+    Message: {
+      Body: {
+        Text: {
+         Charset: "UTF-8",
+         Data: log
+        }
+       },
+       Subject: {
+        Charset: 'UTF-8',
+        Data: `(${username}) updateLikedMedia results`
+       }
+      },
+    Source: process.env.SES_ACCOUNT,
+  };
+
+  await ses.sendEmail(params).promise();
 }
 
 module.exports = async ({username, password}) => {
@@ -61,6 +91,7 @@ module.exports = async ({username, password}) => {
     log.push(message);
     return log;
   });
+  await sendLog(username, log);
 
   return log;
 }
